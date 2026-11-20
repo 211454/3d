@@ -1,0 +1,131 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+        A00100000000000000000001 = {
+            isa = PBXProject;
+            attributes = { LastUpgradeCheck = 1600; };
+            buildConfigurationList = A0010000000000000000000A;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = en;
+            knownRegions = (en, Base);
+            mainGroup = A00100000000000000000002;
+            productRefGroup = A00100000000000000000003;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (A00100000000000000000004);
+        };
+        A00100000000000000000002 = {
+            isa = PBXGroup;
+            children = (A00100000000000000000005, A00100000000000000000003);
+            sourceTree = "<group>";
+        };
+        A00100000000000000000003 = {
+            isa = PBXGroup;
+            children = (A00100000000000000000006);
+            name = Products;
+            sourceTree = "<group>";
+        };
+        A00100000000000000000004 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A0010000000000000000000B;
+            buildPhases = (A00100000000000000000007);
+            buildRules = ();
+            dependencies = ();
+            name = AUTOKLINIK3D;
+            productName = AUTOKLINIK3D;
+            productReference = A00100000000000000000006;
+            productType = "com.apple.product-type.application";
+        };
+        A00100000000000000000005 = {
+            isa = PBXFileReference;
+            lastKnownFileType = sourcecode.swift;
+            path = AUTOKLINIK3D.swift;
+            sourceTree = "<group>";
+        };
+        A00100000000000000000006 = {
+            isa = PBXFileReference;
+            explicitFileType = wrapper.application;
+            path = AUTOKLINIK3D.app;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        A00100000000000000000007 = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (A00100000000000000000008);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        A00100000000000000000008 = {
+            isa = PBXBuildFile;
+            fileRef = A00100000000000000000005;
+        };
+        A0010000000000000000000A = {
+            isa = XCConfigurationList;
+            buildConfigurations = (A0010000000000000000000C, A0010000000000000000000D);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A0010000000000000000000B = {
+            isa = XCConfigurationList;
+            buildConfigurations = (A0010000000000000000000E, A0010000000000000000000F);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A0010000000000000000000C = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+                SDKROOT = iphoneos;
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        A0010000000000000000000D = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+                SDKROOT = iphoneos;
+            };
+            name = Release;
+        };
+        A0010000000000000000000E = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "AUTOKLINIK 3D";
+                INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+                MARKETING_VERSION = 0.2;
+                PRODUCT_BUNDLE_IDENTIFIER = de.autoklinik.alignment.prototype;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+            };
+            name = Debug;
+        };
+        A0010000000000000000000F = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "AUTOKLINIK 3D";
+                INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+                MARKETING_VERSION = 0.2;
+                PRODUCT_BUNDLE_IDENTIFIER = de.autoklinik.alignment.prototype;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+            };
+            name = Release;
+        };
+    };
+    rootObject = A00100000000000000000001;
+}
