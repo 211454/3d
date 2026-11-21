@@ -337,10 +337,10 @@ struct ContentView: View {
         let readings = mode == .camber ? model.saved : model.toeSaved
         let sum: Double? = {
             guard let a = readings[left], let b = readings[right] else { return nil }
-            return a + b
+            return mode == .toe ? a + b : a - b
         }()
         return VStack(spacing: 8) {
-            Text(german ? "Gesamt" : "Сумма")
+            Text(mode == .toe ? (german ? "Summe (Test)" : "Сумма (тест)") : (german ? "Links − rechts" : "Левое − правое"))
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             Text(sum.map(formatted) ?? "—")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
