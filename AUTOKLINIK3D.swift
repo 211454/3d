@@ -144,7 +144,81 @@ final class AlignmentModel: ObservableObject {
     }
 }
 
+
+/// Experimental rolling capture. Measures repeatable phone tilt changes, NOT validated wheel alignment.
+@MainActor final class RollingCapture: ObservableObject {
+    @Published private(set) var first: Double?
+    @Published private(set) var second: Double?
+    @Published private(set) var phase = 0
+    @Published private(set) var stable = false
+    private let motion = CMMotionManager()
+    private var timer: Timer?
+    private var values: [Double] = []
+    private var movementObserved = false
+
+    var difference: Double? {
+        guard let first, let second else { return nil }
+        return second - first
+    }
+
+    func start() {
+        stop()
+        first = nil
+        second = nil
+        phase = 1
+        movementObserved = false
+        values = []
+        guard motion.isDeviceMotionAvailable else { phase = 0; return }
+        motion.deviceMotionUpdateInterval = 0.05
+        motion.startDeviceMotionUpdates()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sample() }
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        motion.stopDeviceMotionUpdates()
+    }
+
+    private func sample() {
+        guard let data = motion.deviceMotion, phase == 1 || phase == 2 else { return }
+        let rotation = data.rotationRate
+        let acceleration = data.userAcceleration
+        let moving = sqrt(rotation.x*rotation.x + rotation.y*rotation.y + rotation.z*rotation.z) > 0.15 ||
+            sqrt(acceleration.x*acceleration.x + acceleration.y*acceleration.y + acceleration.z*acceleration.z) > 0.12
+        if moving {
+            if phase == 2 { movementObserved = true }
+            values.removeAll()
+            stable = false
+            return
+        }
+        if phase == 2 && !movementObserved { return }
+        let gravity = data.gravity
+        let tilt = atan2(gravity.z, hypot(gravity.x, gravity.y)) * 180 / Double.pi
+        guard tilt.isFinite else { return }
+        values.append(tilt)
+        if values.count > 40 { values.removeFirst() }
+        guard values.count == 40 else { return }
+        let spread = (values.max() ?? tilt) - (values.min() ?? tilt)
+        stable = spread < 0.2
+        guard stable else { return }
+        let mean = values.reduce(0,+) / Double(values.count)
+        if phase == 1 {
+            first = mean
+            phase = 2
+            values.removeAll()
+        } else {
+            second = mean
+            phase = 3
+            stop()
+        }
+    }
+}
+
 struct ContentView: View {
+    @StateObject private var rolling = RollingCapture()
     @StateObject private var model = AlignmentModel()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("alignmentGerman") private var german = false
@@ -166,6 +240,20 @@ struct ContentView: View {
                         .font(.system(size: 38, weight: .bold, design: .rounded))
                         .monospacedDigit()
                     Text(status).font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(german ? "Rolltest (experimentell)" : "Тестовая прокатка").font(.headline)
+                        Text(rolling.phase == 1 ? (german ? "Erste Position stabil halten" : "Держи телефон неподвижно для первого замера") :
+                             rolling.phase == 2 ? (german ? "Fahrzeug langsam rollen und anhalten" : "Медленно прокати машину и останови") :
+                             rolling.phase == 3 ? (german ? "Zwei Positionen gespeichert" : "Два положения записаны") :
+                             (german ? "Bereit" : "Готов к тесту"))
+                        Button(german ? "Rolltest starten" : "Начать прокатку") { rolling.start() }
+                            .buttonStyle(.borderedProminent)
+                        if let first = rolling.first { Text("A: \\(formatted(first))") }
+                        if let second = rolling.second { Text("B: \\(formatted(second))") }
+                        if let difference = rolling.difference { Text((german ? "Differenz: " : "Разница: ") + formatted(difference)) }
+                        Text(german ? "Nur Sensortest, keine validierte Achsvermessung." : "Только тест датчика, не точное измерение развала или схождения.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.padding(12)
                     carDiagram
                     HStack {
                         Text(german ? "Vorne L−R" : "Разница спереди")
@@ -197,7 +285,7 @@ struct ContentView: View {
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: mode) { value in model.setMode(value) }
         .onChange(of: scenePhase) { phase in
-            if phase != .active { model.stop() }
+            if phase != .active { model.stop(); rolling.stop() }
         }
     }
 
