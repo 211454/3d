@@ -83,7 +83,7 @@ final class AlignmentModel: ObservableObject {
     private func readMotion() {
         guard running else { return }
         guard let sample = motion.deviceMotion,
-              ProcessInfo.processInfo.systemUptime - sample.timestamp < 0.25 else {
+              sample.timestamp > 0 else {
             correctPosition = false
             resetSampling()
             return
@@ -96,12 +96,12 @@ final class AlignmentModel: ObservableObject {
         guard raw.isFinite else { return }
         liveAngle = raw - zero
         // Portrait, top edge up, screen facing away from the vehicle.
-        correctPosition = gravity.y < -0.9 && abs(gravity.x) < 0.25
+        correctPosition = abs(gravity.y) > 0.75 && abs(gravity.x) < 0.55
         let rotation = sample.rotationRate
         let acceleration = sample.userAcceleration
         guard correctPosition,
-              hypot(hypot(rotation.x, rotation.y), rotation.z) < 0.04,
-              hypot(hypot(acceleration.x, acceleration.y), acceleration.z) < 0.03 else {
+              hypot(hypot(rotation.x, rotation.y), rotation.z) < 0.15,
+              hypot(hypot(acceleration.x, acceleration.y), acceleration.z) < 0.12 else {
             resetSampling()
             return
         }
@@ -111,7 +111,7 @@ final class AlignmentModel: ObservableObject {
         let minimum = samples.min() ?? raw
         let maximum = samples.max() ?? raw
         angle = samples.reduce(0, +) / Double(samples.count) - zero
-        stable = samples.count == 20 && maximum - minimum <= 0.10
+        stable = samples.count == 20 && maximum - minimum <= 0.30
     }
 }
 
