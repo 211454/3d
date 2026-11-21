@@ -153,68 +153,44 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            ScrollView {
+                VStack(spacing: 16) {
                     Picker(german ? "Sprache" : "Язык", selection: $german) {
                         Text("RU").tag(false)
                         Text("DE").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-
-                    Text(german
-                         ? "iPhone hochkant befestigen, Display nach außen. Den Nullpunkt zuerst mit derselben Halterung an einer senkrechten Referenz setzen."
-                         : "Закрепите iPhone вертикально, экраном наружу. Сначала обнулите прибор с тем же креплением на эталонной вертикальной плоскости.")
-                    .font(.footnote)
-                }
-
-                Section(german ? "Achsvermessung · Test" : "Развал и схождение · тест") {
+                    }.pickerStyle(.segmented)
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
-                    }
-                    .pickerStyle(.segmented)
-                    Picker(german ? "Rad" : "Колесо", selection: $wheel) {
-                        ForEach(Wheel.allCases) { item in
-                            Text(item.label(german: german)).tag(item)
-                        }
-                    }
+                    }.pickerStyle(.segmented)
                     Text(model.liveAngle.map(formatted) ?? "—")
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .accessibilityLabel(german ? "Aktueller Winkel" : "Текущий угол")
-                        .accessibilityValue(model.angle.map(formatted) ?? "—")
-                    levelView
-                    Text(status)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Button(model.running
-                           ? (german ? "Stoppen" : "Остановить")
-                           : (german ? "Starten" : "Начать")) {
-                        model.running ? model.stop() : model.start()
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    carDiagram
+                    HStack {
+                        Text(german ? "Vorne L−R" : "Разница спереди")
+                        Spacer()
+                        Text(model.frontDifference.map(formatted) ?? "—")
                     }
-                    Button(german ? "Nullpunkt setzen" : "Установить ноль") {
-                        model.calibrate()
+                    HStack {
+                        Text(german ? "Hinten L−R" : "Разница сзади")
+                        Spacer()
+                        Text(model.rearDifference.map(formatted) ?? "—")
                     }
-                    .disabled(!model.stable)
-                    Button(german ? "Radwert speichern" : "Записать замер колеса") {
-                        model.save(wheel)
-                    }
-                    .disabled(!model.running || !model.correctPosition || model.angle == nil || !model.calibrated)
-                }
-
-                Section(german ? "Messwerte dieser Sitzung" : "Замеры этой сессии") {
-                    ForEach(Wheel.allCases) { item in
-                        LabeledContent(item.label(german: german) + (german ? " Sturz" : " развал"), value: model.saved[item].map(formatted) ?? "—")
-                        LabeledContent(item.label(german: german) + (german ? " Spur" : " схождение"), value: model.toeSaved[item].map(formatted) ?? "—")
-                    }
-                    LabeledContent(german ? "Sturz vorne L−R" : "Развал передних Л−П", value: model.frontDifference.map(formatted) ?? "—")
-                    LabeledContent(german ? "Sturz hinten L−R" : "Развал задних Л−П", value: model.rearDifference.map(formatted) ?? "—")
+                    HStack {
+                        Button(model.running ? (german ? "Stoppen" : "Остановить") : (german ? "Starten" : "Начать")) {
+                            model.running ? model.stop() : model.start()
+                        }
+                        Spacer()
+                        Button(german ? "Nullpunkt" : "Установить ноль") { model.calibrate() }
+                            .disabled(!model.stable)
+                    }.buttonStyle(.borderedProminent)
                     Text(german
-                         ? "Die Genauigkeit am Fahrzeug ist ungeprüft. Felgenschlag und Standflächenneigung werden nicht kompensiert. Spur ist nur eine unvalidierte relative Drehungsmessung."
-                         : "Точность на автомобиле предстоит проверить. Биение диска и уклон площадки не компенсируются. Схождение — экспериментальная оценка относительного поворота, не проверенный стенд.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                         ? "Testmessung: Spur ist nicht für eine professionelle Achsvermessung validiert."
+                         : "Тестовый режим: точность схождения для профессионального сход-развала не подтверждена.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
+                .padding()
             }
             .navigationTitle("AUTOKLINIK 3D")
         }
@@ -223,6 +199,67 @@ struct ContentView: View {
         .onChange(of: scenePhase) { phase in
             if phase != .active { model.stop() }
         }
+    }
+
+    private var carDiagram: some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(spacing: 28) {
+                wheelTile(.frontLeft)
+                wheelTile(.rearLeft)
+            }
+            VStack(spacing: 0) {
+                Text(german ? "VORNE" : "ПЕРЕД").font(.caption2).foregroundStyle(.secondary)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 25)
+                        .fill(LinearGradient(colors: [.gray.opacity(0.45), .blue.opacity(0.15)], startPoint: .top, endPoint: .bottom))
+                        .overlay(RoundedRectangle(cornerRadius: 25).stroke(.blue, lineWidth: 2))
+                    VStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.35)).frame(height: 44)
+                        Spacer()
+                        Image(systemName: "car.top.door.front.left.open")
+                            .font(.system(size: 32)).foregroundStyle(.blue)
+                        Spacer()
+                        RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.35)).frame(height: 35)
+                    }.padding(10)
+                }
+                .frame(maxWidth: 110, minHeight: 290)
+                Text(german ? "HINTEN" : "ЗАД").font(.caption2).foregroundStyle(.secondary)
+            }
+            VStack(spacing: 28) {
+                wheelTile(.frontRight)
+                wheelTile(.rearRight)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func wheelTile(_ item: Wheel) -> some View {
+        let reading = mode == .camber ? model.saved[item] : model.toeSaved[item]
+        return VStack(spacing: 6) {
+            Text(item.label(german: german))
+                .font(.system(size: 10, weight: .semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(height: 28)
+            Image(systemName: "circle.hexagongrid.fill")
+                .font(.system(size: 28))
+                .foregroundStyle(wheel == item ? .blue : .secondary)
+            Text(reading.map(formatted) ?? "—")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Button(german ? "Speichern" : "Записать") {
+                wheel = item
+                model.save(item)
+            }
+            .font(.system(size: 11))
+            .buttonStyle(.bordered)
+            .disabled(!model.running || !model.correctPosition || model.angle == nil || !model.calibrated)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(6)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(wheel == item ? 0.15 : 0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.blue.opacity(0.5)))
+        .onTapGesture { wheel = item }
     }
 
     private var levelView: some View {
