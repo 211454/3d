@@ -38,3 +38,31 @@ workflows:
             --scheme AUTOKLINIK3D
     artifacts:
       - build/ios/ipa/*.ipa
+
+  ios-altstore:
+    name: AUTOKLINIK 3D - unsigned IPA for AltStore
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+    scripts:
+      - name: Build iPhone app without Apple signing
+        script: |
+          xcodebuild build \
+            -project AUTOKLINIK3D.xcodeproj \
+            -scheme AUTOKLINIK3D \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Package unsigned IPA for AltStore
+        script: |
+          set -e
+          APP_PATH="build/Build/Products/Debug-iphoneos/AUTOKLINIK3D.app"
+          test -d "$APP_PATH"
+          mkdir -p artifacts/Payload
+          cp -R "$APP_PATH" artifacts/Payload/
+          (cd artifacts && zip -qry AUTOKLINIK3D-unsigned.ipa Payload)
+          test -s artifacts/AUTOKLINIK3D-unsigned.ipa
+    artifacts:
+      - artifacts/AUTOKLINIK3D-unsigned.ipa
