@@ -19,6 +19,7 @@ enum Wheel: String, CaseIterable, Identifiable {
 @MainActor
 final class AlignmentModel: ObservableObject {
     @Published private(set) var angle: Double?
+    @Published private(set) var liveAngle: Double?
     @Published private(set) var running = false
     @Published private(set) var unavailable = false
     @Published private(set) var stable = false
@@ -54,6 +55,7 @@ final class AlignmentModel: ObservableObject {
         timer = nil
         motion.stopDeviceMotionUpdates()
         running = false
+        liveAngle = nil
         correctPosition = false
         resetSampling()
     }
@@ -90,6 +92,9 @@ final class AlignmentModel: ObservableObject {
         lastTimestamp = sample.timestamp
 
         let gravity = sample.gravity
+        let raw = atan2(gravity.z, hypot(gravity.x, gravity.y)) * 180 / .pi
+        guard raw.isFinite else { return }
+        liveAngle = raw - zero
         // Portrait, top edge up, screen facing away from the vehicle.
         correctPosition = gravity.y < -0.9 && abs(gravity.x) < 0.25
         let rotation = sample.rotationRate
@@ -101,11 +106,6 @@ final class AlignmentModel: ObservableObject {
             return
         }
 
-        let raw = atan2(gravity.z, hypot(gravity.x, gravity.y)) * 180 / .pi
-        guard raw.isFinite else {
-            resetSampling()
-            return
-        }
         samples.append(raw)
         if samples.count > 20 { samples.removeFirst() }
         let minimum = samples.min() ?? raw
@@ -143,11 +143,12 @@ struct ContentView: View {
                             Text(item.label(german: german)).tag(item)
                         }
                     }
-                    Text(model.angle.map(formatted) ?? "—")
+                    Text(model.liveAngle.map(formatted) ?? "—")
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .accessibilityLabel(german ? "Aktueller Winkel" : "Текущий угол")
                         .accessibilityValue(model.angle.map(formatted) ?? "—")
+                    levelView
                     Text(status)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -187,6 +188,26 @@ struct ContentView: View {
         }
     }
 
+    private var levelView: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle().stroke(.secondary, lineWidth: 5)
+                Circle().stroke(.blue.opacity(0.6), lineWidth: 2).padding(16)
+                Rectangle().fill(.secondary.opacity(0.6)).frame(width: 2, height: 130)
+                Rectangle().fill(.secondary.opacity(0.6)).frame(width: 130, height: 2)
+                Capsule().fill(.blue).frame(width: 8, height: 115)
+                    .rotationEffect(.degrees(model.liveAngle ?? 0))
+                Circle().fill(.blue).frame(width: 15, height: 15)
+            }
+            .frame(width: 150, height: 150)
+            Text(german ? "Live-Neigung (Test)" : "Живой уровень (тест)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+
     private var status: String {
         if model.unavailable {
             return german ? "Bewegungssensor nicht verfügbar." : "Датчик движения недоступен."
@@ -194,8 +215,11 @@ struct ContentView: View {
         if !model.running {
             return german ? "Messung angehalten." : "Замер остановлен."
         }
+        if model.liveAngle == nil {
+            return german ? "Warte auf Sensordaten…" : "Ожидание данных датчика…"
+        }
         if !model.correctPosition {
-            return german ? "iPhone senkrecht ausrichten." : "Поставьте iPhone вертикально."
+            return german ? "Live-Wert aktiv. Für Speichern iPhone senkrecht ausrichten." : "Уровень работает. Для записи поставьте iPhone вертикально."
         }
         if !model.stable {
             return german ? "iPhone ruhig halten." : "Удерживайте iPhone неподвижно."
