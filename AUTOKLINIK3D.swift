@@ -25,7 +25,7 @@ final class AlignmentModel: ObservableObject {
     @Published private(set) var stable = false
     @Published private(set) var calibrated = false
     @Published private(set) var correctPosition = false
-    @Published private(set) var saved: [Wheel: Double] = [:]
+    @Published private(set) var saved: [Wheel: Double] = [:]\n    var frontDifference: Double? { guard let l = saved[.frontLeft], let r = saved[.frontRight] else { return nil }; return l - r }\n    var rearDifference: Double? { guard let l = saved[.rearLeft], let r = saved[.rearRight] else { return nil }; return l - r }
 
     private let motion = CMMotionManager()
     private var timer: Timer?
@@ -75,7 +75,7 @@ final class AlignmentModel: ObservableObject {
     }
 
     func save(_ wheel: Wheel) {
-        guard running, stable, calibrated, let angle else { return }
+        guard running, calibrated, correctPosition, let angle, angle.isFinite else { return }
         saved[wheel] = angle
         resetSampling()
     }
@@ -165,7 +165,7 @@ struct ContentView: View {
                     Button(german ? "Radwert speichern" : "Записать замер колеса") {
                         model.save(wheel)
                     }
-                    .disabled(!model.stable || !model.calibrated)
+                    .disabled(!model.running || !model.correctPosition || model.angle == nil || !model.calibrated)
                 }
 
                 Section(german ? "Messwerte dieser Sitzung" : "Замеры этой сессии") {
