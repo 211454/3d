@@ -126,14 +126,14 @@ final class AlignmentModel: ObservableObject {
 
         let gravity = sample.gravity
         let raw = mode == .camber
-            ? atan2(gravity.z, hypot(gravity.x, gravity.y)) * 180 / .pi
+            ? atan2(gravity.x, -gravity.y) * 180 / .pi
             : (sample.attitude.yaw - toeZero) * 180 / .pi
         guard raw.isFinite else { return }
         let offset = mode == .camber ? zero : 0
         let measured = mode == .camber ? raw - offset : atan2(sin(raw * .pi / 180), cos(raw * .pi / 180)) * 180 / .pi
         liveAngle = measured
         // Portrait, top edge up, screen facing away from the vehicle.
-        correctPosition = abs(gravity.y) > 0.75 && abs(gravity.x) < 0.55
+        correctPosition = hypot(gravity.x, gravity.y) > 0.75
         let rotation = sample.rotationRate
         let acceleration = sample.userAcceleration
         guard correctPosition,
@@ -296,6 +296,7 @@ struct ContentView: View {
                 .padding()
             }
             .navigationTitle("AUTOKLINIK 3D")
+        .preferredColorScheme(.dark)
         }
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
@@ -305,61 +306,95 @@ struct ContentView: View {
     }
 
     private var carDiagram: some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(spacing: 28) {
+        VStack(spacing: 12) {
+            Text(german ? "VORDERACHSE" : "ПЕРЕДНЯЯ ОСЬ")
+                .font(.caption.bold()).foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: 10) {
                 wheelTile(.frontLeft)
-                wheelTile(.rearLeft)
-            }
-            VStack(spacing: 0) {
-                Text(german ? "VORNE" : "ПЕРЕД").font(.caption2).foregroundStyle(.secondary)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 25)
-                        .fill(LinearGradient(colors: [.gray.opacity(0.45), .blue.opacity(0.15)], startPoint: .top, endPoint: .bottom))
-                        .overlay(RoundedRectangle(cornerRadius: 25).stroke(.blue, lineWidth: 2))
-                    VStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.35)).frame(height: 44)
-                        Spacer()
-                        Image(systemName: "car.top.door.front.left.open")
-                            .font(.system(size: 32)).foregroundStyle(.blue)
-                        Spacer()
-                        RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.35)).frame(height: 35)
-                    }.padding(10)
-                }
-                .frame(maxWidth: 110, minHeight: 290)
-                Text(german ? "HINTEN" : "ЗАД").font(.caption2).foregroundStyle(.secondary)
-            }
-            VStack(spacing: 28) {
+                axleReadout(front: true)
                 wheelTile(.frontRight)
+            }
+            Image(systemName: "car.top.door.front.left.open")
+                .font(.system(size: 75, weight: .ultraLight))
+                .foregroundStyle(.cyan.opacity(0.75))
+                .frame(height: 110)
+            HStack(alignment: .center, spacing: 10) {
+                wheelTile(.rearLeft)
+                axleReadout(front: false)
                 wheelTile(.rearRight)
             }
+            Text(german ? "HINTERACHSE" : "ЗАДНЯЯ ОСЬ")
+                .font(.caption.bold()).foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color.black))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.gray.opacity(0.35)))
+    }
+
+    private func axleReadout(front: Bool) -> some View {
+        let left: Wheel = front ? .frontLeft : .rearLeft
+        let right: Wheel = front ? .frontRight : .rearRight
+        let readings = mode == .camber ? model.saved : model.toeSaved
+        let sum: Double? = {
+            guard let a = readings[left], let b = readings[right] else { return nil }
+            return a + b
+        }()
+        return VStack(spacing: 8) {
+            Text(german ? "Gesamt" : "Сумма")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(sum.map(formatted) ?? "—")
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(.green)
+                .monospacedDigit()
+            Capsule().fill(Color.gray.opacity(0.5)).frame(height: 5)
+                .overlay(Circle().fill(.green).frame(width: 10, height: 10))
+            Text(mode == .toe ? (german ? "Spur TEST" : "Схождение ТЕСТ") :
+                    (german ? "Sturzwerte" : "Развал"))
+                .font(.system(size: 9)).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
     }
 
     private func wheelTile(_ item: Wheel) -> some View {
         let reading = mode == .camber ? model.saved[item] : model.toeSaved[item]
-        return VStack(spacing: 6) {
+        return VStack(spacing: 7) {
             Text(item.label(german: german))
                 .font(.system(size: 10, weight: .semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(height: 28)
-            Image(systemName: "circle.hexagongrid.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(wheel == item ? .blue : .secondary)
-            Text(reading.map(formatted) ?? "—")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+            Text(reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—"))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(reading != nil ? .green : .white)
                 .monospacedDigit()
+            ZStack {
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(LinearGradient(colors: [.gray.opacity(0.85), .black, .gray.opacity(0.65)], startPoint: .leading, endPoint: .trailing))
+                HStack(spacing: 5) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        Capsule().fill(Color.gray.opacity(0.65)).frame(width: 2)
+                    }
+                }
+                VStack {
+                    ForEach(0..<7, id: \.self) { _ in
+                        Rectangle().fill(Color.black.opacity(0.65)).frame(height: 2)
+                        Spacer(minLength: 0)
+                    }
+                }.padding(5)
+            }
+            .frame(width: 56, height: 100)
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(reading != nil ? .green : .gray, lineWidth: 2))
             if reading != nil {
-                Label(german ? "Gesperrt" : "Зафиксировано", systemImage: "lock.fill")
-                    .font(.system(size: 10)).foregroundStyle(.green)
+                Label(german ? "Fixiert" : "Сохранено", systemImage: "lock.fill")
+                    .font(.system(size: 9)).foregroundStyle(.green)
                 Button(german ? "Wiederholen" : "Повторить") {
                     wheel = item
                     activeWheel = nil
                     model.unlock(item)
-                }.font(.system(size: 11)).buttonStyle(.bordered)
+                }.font(.system(size: 10)).buttonStyle(.bordered)
             } else if activeWheel == item {
-                Button(german ? "Speichern" : "Сохранить и блокировать") {
+                Button(german ? "Speichern" : "Сохранить") {
                     model.save(item)
                     if (mode == .camber ? model.saved[item] : model.toeSaved[item]) != nil {
                         activeWheel = nil
@@ -368,7 +403,7 @@ struct ContentView: View {
                 .font(.system(size: 10)).buttonStyle(.borderedProminent)
                 .disabled(!model.running || !model.stable || !model.correctPosition || model.angle == nil || !model.calibrated)
             } else {
-                Button(german ? "Messung starten" : "Начать измерение") {
+                Button(german ? "Messung" : "Измерить") {
                     wheel = item
                     activeWheel = item
                     model.resetSampling()
@@ -377,9 +412,9 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(6)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(wheel == item ? 0.15 : 0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.blue.opacity(0.5)))
+        .padding(5)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(wheel == item ? 0.12 : 0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(wheel == item ? .cyan : .gray.opacity(0.25)))
         .onTapGesture { wheel = item }
     }
 
