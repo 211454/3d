@@ -44,6 +44,25 @@ final class AlignmentModel: ObservableObject {
     private var samples: [Double] = []
     private var lastTimestamp: TimeInterval?
     private var zero = 0.0
+    private let storageKey = "autoklinik3d.measurements.v1"
+
+    init() { restoreMeasurements() }
+
+    private struct StoredMeasurements: Codable {
+        let camber: [String: Double]
+        let toe: [String: Double]
+    }
+
+    private func persistMeasurements() {
+        let record = StoredMeasurements(camber: Dictionary(uniqueKeysWithValues: saved.map { ($0.key.rawValue, $0.value) }), toe: Dictionary(uniqueKeysWithValues: toeSaved.map { ($0.key.rawValue, $0.value) }))
+        if let data = try? JSONEncoder().encode(record) { UserDefaults.standard.set(data, forKey: storageKey) }
+    }
+
+    private func restoreMeasurements() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey), let record = try? JSONDecoder().decode(StoredMeasurements.self, from: data) else { return }
+        saved = Dictionary(uniqueKeysWithValues: record.camber.compactMap { key, value in Wheel(rawValue: key).map { ($0, value) } })
+        toeSaved = Dictionary(uniqueKeysWithValues: record.toe.compactMap { key, value in Wheel(rawValue: key).map { ($0, value) } })
+    }
 
     func setMode(_ newMode: MeasurementMode) {
         mode = newMode
@@ -89,11 +108,13 @@ final class AlignmentModel: ObservableObject {
         if mode == .camber {
             zero += angle
             saved.removeAll()
+            persistMeasurements()
         } else {
             guard let heading = motion.deviceMotion?.attitude.yaw else { return }
             toeReference = heading
             toeZero = heading
             toeSaved.removeAll()
+            persistMeasurements()
         }
         calibrated = true
         resetSampling()
@@ -102,6 +123,7 @@ final class AlignmentModel: ObservableObject {
     func unlock(_ wheel: Wheel) {
         if mode == .camber { saved.removeValue(forKey: wheel) }
         else { toeSaved.removeValue(forKey: wheel) }
+        persistMeasurements()
         resetSampling()
     }
 
@@ -110,6 +132,7 @@ final class AlignmentModel: ObservableObject {
 
         guard running, calibrated, correctPosition, let angle, angle.isFinite else { return }
         if mode == .camber { saved[wheel] = angle } else { toeSaved[wheel] = angle }
+        persistMeasurements()
         resetSampling()
     }
 
