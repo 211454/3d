@@ -19,7 +19,7 @@
         };
         A00100000000000000000002 = {
             isa = PBXGroup;
-            children = (A00100000000000000000005, A00100000000000000000003);
+            children = (A00100000000000000000005, A00100000000000000000010, A00100000000000000000003);
             sourceTree = "<group>";
         };
         A00100000000000000000003 = {
@@ -45,6 +45,8 @@
             path = AUTOKLINIK3D.swift;
             sourceTree = "<group>";
         };
+        A00100000000000000000010 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlignmentTestModels.swift; sourceTree = "<group>"; };
+        A00100000000000000000009 = { isa = PBXBuildFile; fileRef = A00100000000000000000010; };
         A00100000000000000000006 = {
             isa = PBXFileReference;
             explicitFileType = wrapper.application;
@@ -54,7 +56,7 @@
         A00100000000000000000007 = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A00100000000000000000008);
+            files = (A00100000000000000000008, A00100000000000000000009);
             runOnlyForDeploymentPostprocessing = 0;
         };
         A00100000000000000000008 = {
