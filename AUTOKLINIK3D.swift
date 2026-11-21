@@ -44,6 +44,7 @@ final class AlignmentModel: ObservableObject {
     private var samples: [Double] = []
     private var lastTimestamp: TimeInterval?
     private var zero = 0.0
+    private var camberCalibrated = false
     private let storageKey = "autoklinik3d.measurements.v1"
 
     init() { restoreMeasurements() }
@@ -66,7 +67,7 @@ final class AlignmentModel: ObservableObject {
 
     func setMode(_ newMode: MeasurementMode) {
         mode = newMode
-        calibrated = newMode == .camber ? calibrated : toeReference != nil
+        calibrated = newMode == .camber ? camberCalibrated : toeReference != nil
         resetSampling()
     }
 
@@ -107,6 +108,7 @@ final class AlignmentModel: ObservableObject {
         guard stable, let angle else { return }
         if mode == .camber {
             zero += angle
+            camberCalibrated = true
             saved.removeAll()
             persistMeasurements()
         } else {
@@ -150,10 +152,10 @@ final class AlignmentModel: ObservableObject {
         let gravity = sample.gravity
         let raw = mode == .camber
             ? atan2(gravity.x, -gravity.y) * 180 / .pi
-            : (sample.attitude.yaw - toeZero) * 180 / .pi
+            : atan2(sin(sample.attitude.yaw - toeZero), cos(sample.attitude.yaw - toeZero)) * 180 / .pi
         guard raw.isFinite else { return }
         let offset = mode == .camber ? zero : 0
-        let measured = mode == .camber ? raw - offset : atan2(sin(raw * .pi / 180), cos(raw * .pi / 180)) * 180 / .pi
+        let measured = mode == .camber ? raw - offset : raw
         liveAngle = measured
         // Portrait, top edge up, screen facing away from the vehicle.
         correctPosition = hypot(gravity.x, gravity.y) > 0.75
@@ -445,7 +447,7 @@ struct ContentView: View {
         .padding(5)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(wheel == item ? 0.12 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(wheel == item ? .cyan : .gray.opacity(0.25)))
-        .onTapGesture { wheel = item }
+        .onTapGesture { wheel = item; activeWheel = item; model.resetSampling(); if !model.running { model.start() } }
     }
 
     private var levelView: some View {
