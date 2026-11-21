@@ -44,6 +44,13 @@ final class AlignmentModel: ObservableObject {
     private var samples: [Double] = []
     private var lastTimestamp: TimeInterval?
     private var zero = 0.0
+    @Published private(set) var countdown = 0.0
+    @Published private(set) var adjustment = false
+    private var stableSince: TimeInterval?
+    private var selectedWheel: Wheel = .frontLeft
+
+    func selectWheel(_ value: Wheel) { selectedWheel = value; resetSampling() }
+    func setAdjustment(_ value: Bool) { adjustment = value; resetSampling() }
 
     func setMode(_ newMode: MeasurementMode) {
         mode = newMode
@@ -82,6 +89,8 @@ final class AlignmentModel: ObservableObject {
         samples.removeAll(keepingCapacity: true)
         stable = false
         angle = nil
+        stableSince = nil
+        countdown = 0
     }
 
     func calibrate() {
@@ -141,6 +150,11 @@ final class AlignmentModel: ObservableObject {
         let maximum = samples.max() ?? raw
         angle = samples.reduce(0, +) / Double(samples.count)
         stable = samples.count == 20 && maximum - minimum <= 0.30
+        if adjustment { return }
+        guard stable, calibrated else { stableSince = nil; countdown = 0; return }
+        if stableSince == nil { stableSince = sample.timestamp }
+        countdown = min(4, sample.timestamp - (stableSince ?? sample.timestamp))
+        if countdown >= 4 { save(selectedWheel) }
     }
 }
 
@@ -224,6 +238,7 @@ struct ContentView: View {
     @AppStorage("alignmentGerman") private var german = false
     @State private var wheel = Wheel.frontLeft
     @State private var mode = MeasurementMode.camber
+    @State private var adjustment = false
 
     var body: some View {
         NavigationStack {
@@ -236,6 +251,13 @@ struct ContentView: View {
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
                     }.pickerStyle(.segmented)
+                    Picker(german ? "Phase" : "Этап", selection: $adjustment) {
+                        Text(german ? "Prüfung" : "Проверка").tag(false)
+                        Text(german ? "Einstellung" : "Регулировка").tag(true)
+                    }.pickerStyle(.segmented)
+                    if !adjustment && model.running && model.calibrated {
+                        ProgressView(value: model.countdown, total: 4)
+                    }
                     Text(model.liveAngle.map(formatted) ?? "—")
                         .font(.system(size: 38, weight: .bold, design: .rounded))
                         .monospacedDigit()
@@ -282,7 +304,8 @@ struct ContentView: View {
             }
             .navigationTitle("AUTOKLINIK 3D")
         }
-        .onChange(of: wheel) { _ in model.resetSampling() }
+        .onChange(of: wheel) { value in model.selectWheel(value) }
+        .onChange(of: adjustment) { value in model.setAdjustment(value) }
         .onChange(of: mode) { value in model.setMode(value) }
         .onChange(of: scenePhase) { phase in
             if phase != .active { model.stop(); rolling.stop() }
@@ -322,7 +345,7 @@ struct ContentView: View {
     }
 
     private func wheelTile(_ item: Wheel) -> some View {
-        let reading = mode == .camber ? model.saved[item] : model.toeSaved[item]
+        let reading = adjustment && wheel == item ? model.liveAngle : (mode == .camber ? model.saved[item] : model.toeSaved[item])
         return VStack(spacing: 6) {
             Text(item.label(german: german))
                 .font(.system(size: 10, weight: .semibold))
