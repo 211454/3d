@@ -99,7 +99,15 @@ final class AlignmentModel: ObservableObject {
         resetSampling()
     }
 
+    func unlock(_ wheel: Wheel) {
+        if mode == .camber { saved.removeValue(forKey: wheel) }
+        else { toeSaved.removeValue(forKey: wheel) }
+        resetSampling()
+    }
+
     func save(_ wheel: Wheel) {
+        guard (mode == .camber ? saved[wheel] : toeSaved[wheel]) == nil else { return }
+
         guard running, calibrated, correctPosition, let angle, angle.isFinite else { return }
         if mode == .camber { saved[wheel] = angle } else { toeSaved[wheel] = angle }
         resetSampling()
@@ -224,6 +232,8 @@ struct ContentView: View {
     @AppStorage("alignmentGerman") private var german = false
     @State private var wheel = Wheel.frontLeft
     @State private var mode = MeasurementMode.camber
+    @State private var selectedVehicle = "VW Golf 7"
+    @State private var activeWheel: Wheel?
 
     var body: some View {
         NavigationStack {
@@ -233,6 +243,11 @@ struct ContentView: View {
                         Text("RU").tag(false)
                         Text("DE").tag(true)
                     }.pickerStyle(.segmented)
+                    Picker(german ? "Fahrzeug (Demo)" : "Автомобиль (тест)", selection: $selectedVehicle) {
+                        ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
+                    }
+                    Text(german ? "Keine geprüften Herstellervorgaben hinterlegt" : "Заводские нормативы не подключены — только тест")
+                        .font(.caption).foregroundStyle(.orange)
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
                     }.pickerStyle(.segmented)
@@ -283,7 +298,7 @@ struct ContentView: View {
             .navigationTitle("AUTOKLINIK 3D")
         }
         .onChange(of: wheel) { _ in model.resetSampling() }
-        .onChange(of: mode) { value in model.setMode(value) }
+        .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
         .onChange(of: scenePhase) { phase in
             if phase != .active { model.stop(); rolling.stop() }
         }
@@ -335,13 +350,31 @@ struct ContentView: View {
             Text(reading.map(formatted) ?? "—")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .monospacedDigit()
-            Button(german ? "Speichern" : "Записать") {
-                wheel = item
-                model.save(item)
+            if reading != nil {
+                Label(german ? "Gesperrt" : "Зафиксировано", systemImage: "lock.fill")
+                    .font(.system(size: 10)).foregroundStyle(.green)
+                Button(german ? "Wiederholen" : "Повторить") {
+                    wheel = item
+                    activeWheel = nil
+                    model.unlock(item)
+                }.font(.system(size: 11)).buttonStyle(.bordered)
+            } else if activeWheel == item {
+                Button(german ? "Speichern" : "Сохранить и блокировать") {
+                    model.save(item)
+                    if (mode == .camber ? model.saved[item] : model.toeSaved[item]) != nil {
+                        activeWheel = nil
+                    }
+                }
+                .font(.system(size: 10)).buttonStyle(.borderedProminent)
+                .disabled(!model.running || !model.stable || !model.correctPosition || model.angle == nil || !model.calibrated)
+            } else {
+                Button(german ? "Messung starten" : "Начать измерение") {
+                    wheel = item
+                    activeWheel = item
+                    model.resetSampling()
+                    if !model.running { model.start() }
+                }.font(.system(size: 10)).buttonStyle(.bordered)
             }
-            .font(.system(size: 11))
-            .buttonStyle(.bordered)
-            .disabled(!model.running || !model.correctPosition || model.angle == nil || !model.calibrated)
         }
         .frame(maxWidth: .infinity)
         .padding(6)
