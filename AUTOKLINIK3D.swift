@@ -244,6 +244,12 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    Text("AUTOKLINIK 3D • TEST V2 • 21.11.2026")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.15)))
                     Picker(german ? "Sprache" : "Язык", selection: $german) {
                         Text("RU").tag(false)
                         Text("DE").tag(true)
@@ -302,7 +308,7 @@ struct ContentView: View {
                 }
                 .padding()
             }
-            .navigationTitle("AUTOKLINIK 3D")
+            .navigationTitle("AUTOKLINIK 3D TEST V2")
         }
         .onChange(of: wheel) { value in model.selectWheel(value) }
         .onChange(of: adjustment) { value in model.setAdjustment(value) }
