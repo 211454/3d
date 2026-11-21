@@ -270,16 +270,8 @@ struct ContentView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(12)
                     carDiagram
-                    HStack {
-                        Text(german ? "Vorne L−R" : "Разница спереди")
-                        Spacer()
-                        Text(model.frontDifference.map(formatted) ?? "—")
-                    }
-                    HStack {
-                        Text(german ? "Hinten L−R" : "Разница сзади")
-                        Spacer()
-                        Text(model.rearDifference.map(formatted) ?? "—")
-                    }
+                    Text(german ? "Farben: Türkis = gespeichert, keine OEM-Bewertung. Grün/Rot erst mit geprüften Sollwerten." : "Цвета: голубой — замер сохранён, оценка по заводу недоступна. Зелёный/красный — только с проверенными нормативами.")
+                        .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button(model.running ? (german ? "Stoppen" : "Остановить") : (german ? "Starten" : "Начать")) {
                             model.running ? model.stop() : model.start()
@@ -331,6 +323,21 @@ struct ContentView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.gray.opacity(0.35)))
     }
 
+    // Only a verified vehicle-specific reference can classify a wheel as good or bad.
+    private func wheelColor(_ item: Wheel, reading: Double?) -> Color {
+        guard let reading else { return .white }
+        guard let reference = AlignmentDemoCatalog.verifiedReference(for: selectedVehicle, vin: nil) else { return .cyan }
+        let range: ClosedRange<Double> = {
+            switch (mode, item) {
+            case (.camber, .frontLeft), (.camber, .frontRight): return reference.frontCamberDegrees
+            case (.camber, .rearLeft), (.camber, .rearRight): return reference.rearCamberDegrees
+            case (.toe, .frontLeft), (.toe, .frontRight): return reference.frontToeDegrees
+            case (.toe, .rearLeft), (.toe, .rearRight): return reference.rearToeDegrees
+            }
+        }()
+        return range.contains(reading) ? .green : .red
+    }
+
     private func axleReadout(front: Bool) -> some View {
         let left: Wheel = front ? .frontLeft : .rearLeft
         let right: Wheel = front ? .frontRight : .rearRight
@@ -344,7 +351,7 @@ struct ContentView: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             Text(sum.map(formatted) ?? "—")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(.green)
+                .foregroundStyle(.cyan)
                 .monospacedDigit()
             Capsule().fill(Color.gray.opacity(0.5)).frame(height: 5)
                 .overlay(Circle().fill(.green).frame(width: 10, height: 10))
@@ -366,7 +373,7 @@ struct ContentView: View {
                 .frame(height: 28)
             Text(reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—"))
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(reading != nil ? .green : .white)
+                .foregroundStyle(wheelColor(item, reading: reading))
                 .monospacedDigit()
             ZStack {
                 RoundedRectangle(cornerRadius: 15)
@@ -384,7 +391,7 @@ struct ContentView: View {
                 }.padding(5)
             }
             .frame(width: 56, height: 100)
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(reading != nil ? .green : .gray, lineWidth: 2))
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(reading != nil ? wheelColor(item, reading: reading) : .gray, lineWidth: 2))
             if reading != nil {
                 Label(german ? "Fixiert" : "Сохранено", systemImage: "lock.fill")
                     .font(.system(size: 9)).foregroundStyle(.green)
