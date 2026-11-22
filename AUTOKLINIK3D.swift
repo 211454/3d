@@ -699,6 +699,9 @@ struct FahrzeugscheinScannerScreen: View {
     @State private var processing = false
     @State private var errorText: String?
     @State private var manuallyConfirmed = false
+    @State private var manualSelection = "Passat B6"
+    @State private var manualYear = "2008"
+    @State private var manualSuspension = "G02"
     @State private var modelVariant = ""
     @State private var modelYear = ""
     @State private var referenceStatus = ""
@@ -708,6 +711,29 @@ struct FahrzeugscheinScannerScreen: View {
     }
     var body: some View {
         Form {
+            Section("Ручной выбор — тестовый режим") {
+                Picker("Автомобиль", selection: $manualSelection) {
+                    Text("Volkswagen Passat B6").tag("Passat B6")
+                    Text("Audi Q3 8U").tag("Q3 8U")
+                }
+                TextField("Год выпуска", text: $manualYear).keyboardType(.numberPad)
+                TextField("Код подвески (G02, G05 и др.)", text: $manualSuspension)
+                    .textInputAutocapitalization(.characters)
+                Button("Показать справочные углы") {
+                    referenceStatus = VAGDocumentReference.manualLookup(
+                        model: manualSelection, year: Int(manualYear),
+                        suspension: manualSuspension
+                    )
+                }
+                if !referenceStatus.isEmpty {
+                    Text(referenceStatus).font(.callout).foregroundStyle(.cyan)
+                }
+                Text("Ручной выбор не подтверждает комплектацию. Для регулировки сверяйте заводские данные.")
+                    .font(.caption).foregroundStyle(.orange)
+                Button("Перейти к измерениям (тест)") {
+                    onConfirm("\\(manualSelection) · \\(manualYear) · \\(manualSuspension)")
+                }
+            }
             Section("Zulassungsbescheinigung Teil I") {
                 Button("Сфотографировать документ") { showingCamera = true }
                     .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
@@ -899,6 +925,28 @@ private enum FactoryAlignmentDatabase {
 // Require explicit model generation, year, and suspension code before showing a
 // candidate; do not assert that OCR alone establishes the correct factory setup.
 private enum VAGDocumentReference {
+    static func manualLookup(model: String, year: Int?, suspension: String) -> String {
+        let generation = model.uppercased()
+        let code = suspension.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard let year, year <= 2020 else { return "Укажите год не позднее 2020." }
+        if generation == "PASSAT B6" && (2005...2010).contains(year) {
+            if ["G02","G07","G11","G12","G15"].contains(code) {
+                return "Passat B6 · \\(code): передний развал −0°30′ ±30′; кастер +7°32′ ±30′ (справочно, тест)."
+            }
+            if ["G03","G08","G23","G28"].contains(code) {
+                return "Passat B6 · \\(code): передний развал −0°41′ ±30′; кастер +7°44′ ±30′ (справочно, тест)."
+            }
+        }
+        if generation == "Q3 8U" && (2011...2018).contains(year) {
+            if ["G05","G11","G12","G14","G15","G43"].contains(code) {
+                return "Audi Q3 8U · \\(code): передний развал −0°36′ ±30′; кастер +7°44′ ±30′ (справочно, тест)."
+            }
+            if ["G09","G13"].contains(code) {
+                return "Audi Q3 8U · \\(code): передний развал −0°52′ ±30′; кастер +8°07′ ±30′ (справочно, тест)."
+            }
+        }
+        return "Для этого года или кода подвески нет справочной записи."
+    }
     static func lookup(fields: [String: String], model: String, year: Int?, suspension: String) -> String {
         guard let vin = fields["E"]?.uppercased(),
               vin.range(of: "^[A-HJ-NPR-Z0-9]{17}$", options: .regularExpression) != nil,
