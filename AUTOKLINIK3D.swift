@@ -699,6 +699,10 @@ struct FahrzeugscheinScannerScreen: View {
     @State private var processing = false
     @State private var errorText: String?
     @State private var manuallyConfirmed = false
+    @State private var suspensionCode = ""
+    private var factoryMatch: FactoryAlignmentEntry? {
+        FactoryAlignmentDatabase.find(fields: fields, suspensionCode: suspensionCode)
+    }
     var body: some View {
         Form {
             Section("Zulassungsbescheinigung Teil I") {
@@ -718,7 +722,18 @@ struct FahrzeugscheinScannerScreen: View {
                     }
                 }
                 Section("Проверка автомобиля") {
-                    Text("Заводские углы пока не подтверждены. Сверьте VIN, HSN/TSN и тип подвески с документом. Измерения — только тест, не регулировка по заводским допускам.")
+                    TextField("Код подвески (например, 1BA)", text: $suspensionCode)
+                        .textInputAutocapitalization(.characters)
+                    if let match = factoryMatch {
+                        Text("Найдены заводские данные: \\(match.make) \\(match.model) — \\(match.suspensionCode)")
+                        Text("Источник: \\(match.source)")
+                        Text(String(format: "Передний развал: %.2f° ± %.2f°", match.frontCamber, match.frontCamberTolerance))
+                        Text(String(format: "Переднее схождение на колесо: %.2f° ± %.2f°", match.frontToePerWheel, match.frontToeTolerance))
+                    } else {
+                        Text("Проверенных заводских углов для точной модификации и подвески пока нет. Нельзя использовать тестовые углы как заводские.")
+                            .foregroundStyle(.orange)
+                    }
+                    Text("Сверьте VIN, HSN/TSN и подвеску с документом. Без заводских данных измерения остаются только тестом.")
                     Toggle("Я сверил данные с техпаспортом", isOn: $manuallyConfirmed)
                     Button("Перейти к измерениям (тест)") {
                         let summary = [fields["D.1"], fields["D.3"], fields["E"]].compactMap { $0 }.joined(separator: " · ")
@@ -794,5 +809,46 @@ private struct FahrzeugscheinCamera: UIViewControllerRepresentable {
             onComplete(info[.originalImage] as? UIImage)
         }
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onComplete(nil) }
+    }
+}
+
+
+// MARK: - Strict factory alignment database matching
+// Only records supported by an identifiable source may be added here.
+// A VIN and HSN/TSN do not by themselves establish suspension PR codes.
+private struct FactoryAlignmentEntry {
+    let make: String
+    let model: String
+    let suspensionCode: String
+    let vinPrefix: String
+    let hsn: String
+    let tsn: String
+    let frontCamber: Double
+    let frontCamberTolerance: Double
+    let frontToePerWheel: Double
+    let frontToeTolerance: Double
+    let source: String
+}
+
+private enum FactoryAlignmentDatabase {
+    // Intentionally empty until authoritative variant-specific records and
+    // VIN/HSN/TSN mappings are validated. Never fabricate factory limits.
+    static let verified: [FactoryAlignmentEntry] = []
+
+    static func find(fields: [String: String], suspensionCode: String) -> FactoryAlignmentEntry? {
+        guard let vin = fields["E"]?.uppercased(),
+              vin.range(of: "^[A-HJ-NPR-Z0-9]{17}$", options: .regularExpression) != nil,
+              let hsn = fields["2.1"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let tsn = fields["2.2"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let make = fields["D.1"]?.uppercased(),
+              let model = fields["D.3"]?.uppercased(),
+              !suspensionCode.isEmpty else { return nil }
+        return verified.first {
+            $0.make.uppercased() == make &&
+            $0.model.uppercased() == model &&
+            $0.suspensionCode.uppercased() == suspensionCode.uppercased() &&
+            $0.hsn == hsn && $0.tsn == tsn &&
+            vin.hasPrefix($0.vinPrefix.uppercased())
+        }
     }
 }
