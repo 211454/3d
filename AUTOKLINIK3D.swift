@@ -286,6 +286,7 @@ final class VoiceCommandController: ObservableObject {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var lastProcessed = ""
+    private var tapInstalled = false
 
     func start(locale: String) {
         guard !listening else { return }
@@ -317,6 +318,7 @@ final class VoiceCommandController: ObservableObject {
             input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 req.append(buffer)
             }
+            tapInstalled = true
             engine.prepare()
             try engine.start()
             listening = true
@@ -352,7 +354,7 @@ final class VoiceCommandController: ObservableObject {
 
     func stop() {
         if engine.isRunning { engine.stop() }
-        engine.inputNode.removeTap(onBus: 0)
+        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
         request?.endAudio()
         task?.cancel()
         task = nil
