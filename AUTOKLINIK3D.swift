@@ -357,7 +357,7 @@ struct ContentView: View {
                 model.resetSampling()
             }
         }
-        .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
+        .onChange(of: mode) { value in model.setMode(value) }
         .onChange(of: scenePhase) { phase in
             if phase != .active { model.stop(); rolling.stop() }
         }
@@ -371,26 +371,25 @@ struct ContentView: View {
     }
 
     private var centerAction: some View {
-        Group {
-            if completed && !adjusting {
-                Button(german ? "Einstellung starten" : "Начать регулировку") { beginAdjustment() }
-            } else if !guided && !adjusting {
-                Button(german ? "Neue Prüfung" : "Новое измерение") { beginGuided() }
-            } else {
-                Text(adjusting ? (german ? "EINSTELLUNG" : "РЕГУЛИРОВКА") :
-                     (german ? "Automatische Messung" : "Автоматический замер"))
-                    .font(.caption.bold()).foregroundStyle(.cyan)
-            }
-        }
-        .font(.system(size: 12, weight: .bold))
-        .buttonStyle(.borderedProminent).tint(.blue)
-        .lineLimit(2).minimumScaleFactor(0.75).frame(maxWidth: 170)
+        Text(adjusting ? (german ? "EINSTELLUNG" : "РЕГУЛИРОВКА") :
+             (german ? "AUTOMATISCHE MESSUNG" : "АВТОМАТИЧЕСКОЕ ИЗМЕРЕНИЕ"))
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.cyan)
+            .multilineTextAlignment(.center)
     }
 
     private func speak(_ message: String) {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            print("Speech audio session: \(error.localizedDescription)")
+        }
         speech.stopSpeaking(at: .immediate)
         let utterance = AVSpeechUtterance(string: message)
         utterance.voice = AVSpeechSynthesisVoice(language: german ? "de-DE" : "ru-RU")
+        utterance.volume = 1.0
         speech.speak(utterance)
     }
 
@@ -443,8 +442,7 @@ struct ContentView: View {
             guided = false
             completed = true
             activeWheel = nil
-            speak(german ? "Vier Messungen gespeichert. Einstellung starten." :
-                "Измерение четырёх колёс завершено. Нажмите Начать регулировку.")
+            beginAdjustment()
         }
     }
 
