@@ -1,0 +1,705 @@
+{
+  "schemaVersion": 1,
+  "kind": "sourced reference records, not VIN-verified matches",
+  "units": "decimal degrees",
+  "note": "Values from cited publicly accessible technical tables. Do not automatically certify alignment or match by model alone. Passat B6 rear camber can vary by rear equipment; only listed basic/sport cases represented. For Passat B6 source HTML omits negative signs in text rendering; confirm original image before production use.",
+  "records": [
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G02",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.5,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.533333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G07",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.5,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.533333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G11",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.5,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.533333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G12",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.5,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.533333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G15",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.5,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.533333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G03",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6833333333333333,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G08",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6833333333333333,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G23",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6833333333333333,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat B6",
+      "modelYears": [
+        2005,
+        2010
+      ],
+      "frontSuspensionPR": "G28",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6833333333333333,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://diagnostdata.com/volkswagen/passat/b6-2005-2010/remont/differentials-drive-axles/wheels-tires-wheel-alignment/adjustments/",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G05",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G11",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G12",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G14",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G15",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G43",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.6,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 7.733333333333333,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G09",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.8666666666666667,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 8.116666666666667,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    },
+    {
+      "make": "Audi",
+      "model": "Q3 8U",
+      "modelYears": [
+        2011,
+        2018
+      ],
+      "frontSuspensionPR": "G13",
+      "anglesDegrees": {
+        "frontCamber": {
+          "nominal": -0.8666666666666667,
+          "tolerance": 0.5
+        },
+        "frontToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "frontTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        },
+        "frontCaster": {
+          "nominal": 8.116666666666667,
+          "tolerance": 0.5
+        },
+        "rearCamber": {
+          "nominal": -1.3333333333333333,
+          "tolerance": 0.5
+        },
+        "rearToeEach": {
+          "nominal": 0.08333333333333333,
+          "tolerance": 0.08333333333333333
+        },
+        "rearTotalToe": {
+          "nominal": 0.16666666666666666,
+          "tolerance": 0.16666666666666666
+        }
+      },
+      "source": "https://www.richard-hamilton.co.uk/misc/audi/Q3_Alignment.pdf",
+      "validation": "reference-only; exact VIN/variant/ride-height not established"
+    }
+  ]
+}
