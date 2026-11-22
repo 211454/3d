@@ -45,3 +45,57 @@ enum AlignmentDemoCatalog {
     // No fabricated OEM limits: the UI must explicitly show "Demo / no verified OEM data".
     static func verifiedReference(for model: String, vin: String?) -> AlignmentReference? { nil }
 }
+
+
+// Passat B6 (Typ 3C), 2008: reference values by suspension variant.
+// Source: Volkswagen Passat B6 2005–2010 wheel-alignment specification tables.
+// Reference only until the vehicle's PR code and the measurement method are verified.
+// Toe is an AXLE TOTAL; the half displayed by a wheel is an indicative share,
+// not an OEM individual-wheel specification.
+enum PassatB6Suspension: String, CaseIterable, Identifiable {
+    case standard, sport, sport18
+    var id: String { rawValue }
+
+    var prCodes: String {
+        switch self {
+        case .standard: return "G02 / G07 / G11 / G12 / G15"
+        case .sport: return "G03 / G08"
+        case .sport18: return "G23 / G28"
+        }
+    }
+
+    func title(german: Bool) -> String {
+        switch self {
+        case .standard: return german ? "Serie" : "Стандартная"
+        case .sport: return german ? "Sport" : "Спортивная"
+        case .sport18: return german ? "Sport 18 Zoll" : "Спорт, 18 дюймов"
+        }
+    }
+
+    var frontCamberDegrees: Double {
+        switch self {
+        case .standard: return -30.0 / 60.0
+        case .sport, .sport18: return -41.0 / 60.0
+        }
+    }
+    var rearCamberDegrees: Double {
+        switch self {
+        case .standard, .sport: return -(1.0 + 20.0 / 60.0)
+        case .sport18: return -(1.0 + 45.0 / 60.0)
+        }
+    }
+}
+
+enum PassatB6Specs {
+    static let camberToleranceDegrees = 30.0 / 60.0
+    static let toeAxleTotalDegrees = 10.0 / 60.0
+    static let toeAxleToleranceDegrees = 10.0 / 60.0
+
+    static func target(for wheel: Wheel, mode: MeasurementMode, suspension: PassatB6Suspension) -> Double {
+        if mode == .toe { return toeAxleTotalDegrees / 2.0 }
+        switch wheel {
+        case .frontLeft, .frontRight: return suspension.frontCamberDegrees
+        case .rearLeft, .rearRight: return suspension.rearCamberDegrees
+        }
+    }
+}
