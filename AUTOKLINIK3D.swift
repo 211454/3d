@@ -339,8 +339,28 @@ struct ContentView: View {
                 }.padding(14)
             }
             .background(
-                LinearGradient(colors: [Color(red: 0.015, green: 0.055, blue: 0.11), .black, Color(red: 0.015, green: 0.09, blue: 0.17)], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
+                ZStack {
+                    LinearGradient(colors: [Color(red: 0.005, green: 0.018, blue: 0.04), Color(red: 0.015, green: 0.11, blue: 0.20), .black], startPoint: .top, endPoint: .bottom)
+                    GeometryReader { geo in
+                        Path { path in
+                            let horizon = geo.size.height * 0.55
+                            for index in 0...14 {
+                                let x = geo.size.width * CGFloat(index) / 14
+                                path.move(to: CGPoint(x: geo.size.width / 2, y: horizon))
+                                path.addLine(to: CGPoint(x: x, y: geo.size.height))
+                            }
+                            for index in 0...9 {
+                                let fraction = CGFloat(index) / 9
+                                let y = horizon + (geo.size.height - horizon) * fraction * fraction
+                                path.move(to: CGPoint(x: 0, y: y))
+                                path.addLine(to: CGPoint(x: geo.size.width, y: y))
+                            }
+                        }
+                        .stroke(Color.cyan.opacity(0.13), lineWidth: 0.7)
+                        LinearGradient(colors: [.cyan.opacity(0.10), .clear], startPoint: .top, endPoint: .bottom)
+                    }
+                }
+                .ignoresSafeArea()
             )
             .navigationBarHidden(true)
             .preferredColorScheme(.dark)
