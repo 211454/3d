@@ -40,6 +40,7 @@ final class AlignmentModel: ObservableObject {
     private var stableSince: TimeInterval?
     private var toeReference: Double?
     private var toeZero = 0.0
+    private var toeZeroPending = false
     var frontDifference: Double? { guard let l = saved[.frontLeft], let r = saved[.frontRight] else { return nil }; return l - r }
     var rearDifference: Double? { guard let l = saved[.rearLeft], let r = saved[.rearRight] else { return nil }; return l - r }
 
@@ -71,7 +72,7 @@ final class AlignmentModel: ObservableObject {
 
     func newSession() {
         saved.removeAll(); toeSaved.removeAll(); zero = 0; toeZero = 0
-        toeReference = nil; camberCalibrated = false; calibrated = false
+        toeReference = nil; toeZeroPending = false; camberCalibrated = false; calibrated = false
         resetSampling(); persistMeasurements()
     }
 
@@ -90,6 +91,7 @@ final class AlignmentModel: ObservableObject {
         unavailable = false
         resetSampling()
         lastTimestamp = nil
+        if mode == .toe && toeReference == nil { toeZeroPending = true }
         motion.deviceMotionUpdateInterval = 0.05
         motion.startDeviceMotionUpdates(using: .xArbitraryZVertical)
         running = true
@@ -170,19 +172,32 @@ final class AlignmentModel: ObservableObject {
         lastTimestamp = sample.timestamp
 
         let gravity = sample.gravity
+        // Capture one session-wide yaw zero only after the phone is flat and still.
+        // Never recalibrate when moving to another wheel.
+        if mode == .toe && toeReference == nil && toeZeroPending && gravity.z < -0.85 {
+            let rate = sample.rotationRate
+            let acceleration = sample.userAcceleration
+            if hypot(hypot(rate.x, rate.y), rate.z) < 0.08 &&
+               hypot(hypot(acceleration.x, acceleration.y), acceleration.z) < 0.08 {
+                toeZero = sample.attitude.yaw
+                toeReference = toeZero
+                toeZeroPending = false
+                calibrated = true
+            }
+        }
         let raw = mode == .camber
             ? atan2(gravity.x, -gravity.y) * 180 / .pi
             : -atan2(sin(sample.attitude.yaw - toeZero), cos(sample.attitude.yaw - toeZero)) * 180 / .pi
         guard raw.isFinite else { return }
         let offset = mode == .camber ? zero : 0
         let measured = mode == .camber ? raw - offset : raw
-        liveAngle = measured
+        liveAngle = mode == .toe && toeReference == nil ? nil : measured
         // Camber: upright phone. Toe: phone flat, screen facing up.
         correctPosition = mode == .camber ? hypot(gravity.x, gravity.y) > 0.75 : gravity.z < -0.85
         let rotation = sample.rotationRate
         let acceleration = sample.userAcceleration
         movementDetected = hypot(hypot(rotation.x, rotation.y), rotation.z) >= 0.15 || hypot(hypot(acceleration.x, acceleration.y), acceleration.z) >= 0.12
-        guard correctPosition,
+        guard correctPosition, (mode != .toe || toeReference != nil),
               hypot(hypot(rotation.x, rotation.y), rotation.z) < 0.15,
               hypot(hypot(acceleration.x, acceleration.y), acceleration.z) < 0.12 else {
             resetSampling()
@@ -386,8 +401,8 @@ struct ContentView: View {
     private let testTolerance = 1.0 // TEST ONLY: not a factory specification
 
     private var adjustmentTarget: Wheel? {
-        wheelOrder.filter { abs(model.saved[$0] ?? 0) > testTolerance }
-            .max { abs(model.saved[$0] ?? 0) < abs(model.saved[$1] ?? 0) }
+        wheelOrder.filter { abs((mode == .toe ? model.toeSaved : model.saved)[$0] ?? 0) > testTolerance }
+            .max { abs((mode == .toe ? model.toeSaved : model.saved)[$0] ?? 0) < abs((mode == .toe ? model.toeSaved : model.saved)[$1] ?? 0) }
     }
 
     private func beginAdjustment() {
@@ -440,8 +455,8 @@ struct ContentView: View {
         wheelPlacementArmed = true
         zeroReference.removeAll()
         model.newSession()
-        mode = .camber
-        model.setMode(.camber)
+        mode = .toe
+        model.setMode(.toe)
         activeWheel = .frontLeft
         if activeWheel == nil { guided = false; completed = true; return }
         wheel = activeWheel ?? .frontLeft
@@ -457,15 +472,15 @@ struct ContentView: View {
         wheelPlacementArmed = false
         // A four-second stationary window is a stability check, not a
         // physical wheel-angle zero: never subtract the wheel's own tilt.
-        zeroReference[current] = rawAngle
+        if current == .frontLeft { zeroReference[current] = 0 }
         zeroConfirmed = true
         measurementStarted = true
         model.save(current, guidedCapture: true)
-        guard model.saved[current] != nil else {
+        guard (mode == .toe ? model.toeSaved[current] : model.saved[current]) != nil else {
             wheelPlacementArmed = true
             return
         }
-        if let next = wheelOrder.first(where: { model.saved[$0] == nil }) {
+        if let next = wheelOrder.first(where: { (mode == .toe ? model.toeSaved[$0] : model.saved[$0]) == nil }) {
             activeWheel = next
             wheel = next
             awaitingMovement = true
