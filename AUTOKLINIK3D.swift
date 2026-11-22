@@ -2,7 +2,6 @@ import AVFoundation
 import CoreMotion
 import Foundation
 import SwiftUI
-import Speech
 
 enum MeasurementMode: String, CaseIterable, Identifiable {
     case camber, toe
@@ -52,7 +51,7 @@ final class AlignmentModel: ObservableObject {
     private var camberCalibrated = false
     private let storageKey = "autoklinik3d.measurements.v1"
 
-    init() { restoreMeasurements() }
+    init() { /* Each app launch starts a fresh session. */ }
 
     private struct StoredMeasurements: Codable {
         let camber: [String: Double]
@@ -68,6 +67,12 @@ final class AlignmentModel: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: storageKey), let record = try? JSONDecoder().decode(StoredMeasurements.self, from: data) else { return }
         saved = Dictionary(uniqueKeysWithValues: record.camber.compactMap { key, value in Wheel(rawValue: key).map { ($0, value) } })
         toeSaved = Dictionary(uniqueKeysWithValues: record.toe.compactMap { key, value in Wheel(rawValue: key).map { ($0, value) } })
+    }
+
+    func newSession() {
+        saved.removeAll(); toeSaved.removeAll(); zero = 0; toeZero = 0
+        toeReference = nil; camberCalibrated = false; calibrated = false
+        resetSampling(); persistMeasurements()
     }
 
     func setMode(_ newMode: MeasurementMode) {
@@ -274,96 +279,6 @@ final class AlignmentModel: ObservableObject {
 }
 
 
-enum SpokenCommand { case none, zero, start, next, begin, adjust }
-
-@MainActor
-final class VoiceCommandController: ObservableObject {
-    @Published private(set) var listening = false
-    @Published private(set) var lastHeard = ""
-    @Published private(set) var lastCommand: SpokenCommand = .none
-    @Published private(set) var commandSequence = 0
-    private let engine = AVAudioEngine()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
-    private var lastProcessed = ""
-    private var tapInstalled = false
-
-    func start(locale: String) {
-        guard !listening else { return }
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
-            Task { @MainActor in
-                guard status == .authorized else {
-                    self?.lastHeard = "Нет разрешения на распознавание речи"
-                    return
-                }
-                self?.begin(locale: locale)
-            }
-        }
-    }
-
-    private func begin(locale: String) {
-        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)), recognizer.isAvailable else {
-            lastHeard = "Распознавание речи недоступно"
-            return
-        }
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
-            try session.setActive(true)
-            let input = engine.inputNode
-            let format = input.outputFormat(forBus: 0)
-            let req = SFSpeechAudioBufferRecognitionRequest()
-            req.shouldReportPartialResults = true
-            request = req
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-                req.append(buffer)
-            }
-            tapInstalled = true
-            engine.prepare()
-            try engine.start()
-            listening = true
-            task = recognizer.recognitionTask(with: req) { [weak self] result, error in
-                Task { @MainActor in
-                    if let result {
-                        let words = result.bestTranscription.formattedString.lowercased()
-                        self?.lastHeard = words
-                        self?.process(words)
-                    }
-                    if error != nil || result?.isFinal == true { self?.stop() }
-                }
-            }
-        } catch {
-            lastHeard = "Ошибка микрофона: \(error.localizedDescription)"
-            stop()
-        }
-    }
-
-    private func process(_ words: String) {
-        guard words != lastProcessed else { return }
-        let command: SpokenCommand
-        if words.contains("установи ноль") || words.contains("установить ноль") || words.contains("nullpunkt") { command = .zero }
-        else if words.contains("начать измерение") || words.contains("начни измерение") || words.contains("messung starten") { command = .start }
-        else if words.contains("следующее колесо") || words.contains("nächstes rad") { command = .next }
-        else if words.contains("начать проверку") || words.contains("prüfung starten") { command = .begin }
-        else if words.contains("начать регулировку") || words.contains("einstellung starten") { command = .adjust }
-        else { return }
-        lastProcessed = words
-        lastCommand = command
-        commandSequence += 1
-    }
-
-    func stop() {
-        if engine.isRunning { engine.stop() }
-        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
-        request?.endAudio()
-        task?.cancel()
-        task = nil
-        request = nil
-        listening = false
-        try? AVAudioSession.sharedInstance().setActive(false)
-    }
-}
-
 struct ContentView: View {
     @StateObject private var rolling = RollingCapture()
     @StateObject private var model = AlignmentModel()
@@ -378,9 +293,10 @@ struct ContentView: View {
     @State private var completed = false
     @State private var awaitingMovement = false
     @State private var speech = AVSpeechSynthesizer()
-    @StateObject private var voiceControl = VoiceCommandController()
     @State private var zeroConfirmed = false
     @State private var measurementStarted = false
+    @State private var wheelPlacementArmed = true
+    @State private var zeroReference: [Wheel: Double] = [:]
     private let wheelOrder: [Wheel] = [.frontLeft, .frontRight, .rearLeft, .rearRight]
 
     var body: some View {
@@ -404,18 +320,6 @@ struct ContentView: View {
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
                     }.pickerStyle(.segmented)
-                    HStack {
-                        Image(systemName: "waveform").foregroundStyle(.cyan)
-                        Text(voiceControl.listening ? (german ? "Sprachsteuerung aktiv" : "Голосовое управление включено") : (german ? "Sprachsteuerung aus" : "Голосовое управление выключено"))
-                            .font(.caption)
-                        Spacer()
-                        Button(voiceControl.listening ? (german ? "Aus" : "Выключить") : (german ? "Mikrofon" : "Микрофон")) {
-                            if voiceControl.listening { voiceControl.stop() }
-                            else { voiceControl.start(locale: german ? "de-DE" : "ru-RU") }
-                        }.buttonStyle(.bordered)
-                    }
-                    Text(voiceControl.lastHeard.isEmpty ? (german ? "Befehle: Nullpunkt, Messung starten, nächstes Rad" : "Команды: установить ноль, начать измерение, следующее колесо") : voiceControl.lastHeard)
-                        .font(.caption2).foregroundStyle(.secondary)
                     Text(german ? "Nur Sensortest — Spurwerte nicht validiert" : "Тест датчиков: точность схождения не подтверждена")
                         .font(.caption).foregroundStyle(.orange)
                     Text(guided ? (activeWheel?.label(german: german) ?? "") : completed ? (german ? "Messungen abgeschlossen" : "Проверка завершена") : adjusting ? (german ? "Einstellmodus" : "Режим регулировки") : (german ? "Bereit zur Prüfung" : "Готово к проверке"))
@@ -425,9 +329,9 @@ struct ContentView: View {
                         .foregroundStyle(.cyan).monospacedDigit()
                     carDiagram
                     if guided {
-                        Text(awaitingMovement ? (german ? "Telefon zum nächsten Rad bewegen" : "Перенесите телефон на следующее колесо") : !zeroConfirmed ? (german ? "Nullpunkt setzen" : "Установите ноль") : !measurementStarted ? (german ? "Messung starten" : "Начните измерение") : (german ? "Vier Sekunden stabil halten" : "Держите неподвижно четыре секунды"))
+                        Text(awaitingMovement ? (german ? "Telefon zum nächsten Rad bewegen" : "Перенесите телефон на следующее колесо") : (german ? "Vier Sekunden stabil halten" : "Держите неподвижно четыре секунды"))
                             .font(.callout)
-                        if measurementStarted { Text(String(format: "%.1f / 4.0 s", model.stableSeconds)).monospacedDigit() }
+                        Text(String(format: "%.1f / 4.0 s", min(model.stableSeconds, 4))).monospacedDigit()
                     }
                     Text(status).font(.caption).foregroundStyle(.secondary)
                     Text(german ? "Türkis: gespeichert; keine Bewertung ohne geprüfte Sollwerte." : "Голубой: сохранено. Без заводских допусков оценка недоступна.")
@@ -446,41 +350,14 @@ struct ContentView: View {
         .onChange(of: model.movementDetected) { moving in
             if guided && awaitingMovement && moving {
                 awaitingMovement = false
-                zeroConfirmed = false
-                measurementStarted = false
+                wheelPlacementArmed = true
                 model.resetSampling()
-                speak((german ? "Telefon befestigen und Nullpunkt setzen: " : "Закрепите телефон и установите ноль: ") + (activeWheel?.label(german: german) ?? ""))
-            }
-        }
-        .onChange(of: voiceControl.commandSequence) { _ in
-            switch voiceControl.lastCommand {
-            case .zero: performZero()
-            case .start: performStartMeasurement()
-            case .next: if awaitingMovement { awaitingMovement = false; zeroConfirmed = false; measurementStarted = false; model.resetSampling() }
-            case .begin: if !guided && !completed && !adjusting { beginGuided() }
-            case .adjust: if completed { beginAdjustment() }
-            case .none: break
             }
         }
         .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
         .onChange(of: scenePhase) { phase in
-            if phase != .active { model.stop(); rolling.stop(); voiceControl.stop() }
+            if phase != .active { model.stop(); rolling.stop() }
         }
-    }
-
-    private func performZero() {
-        guard guided, !awaitingMovement, !zeroConfirmed, model.stable else { return }
-        // Calibrate the mount once per session; never erase previously saved wheel readings.
-        if !model.calibrated { model.calibrateKeepingMeasurements() }
-        zeroConfirmed = true
-        speak(german ? "Nullpunkt gesetzt. Messung starten." : "Ноль установлен. Начните измерение.")
-    }
-
-    private func performStartMeasurement() {
-        guard guided, zeroConfirmed, !awaitingMovement else { return }
-        measurementStarted = true
-        model.resetSampling()
-        speak(german ? "Messung läuft. Vier Sekunden ruhig halten." : "Измерение началось. Держите телефон неподвижно четыре секунды.")
     }
 
     private func beginAdjustment() {
@@ -494,24 +371,17 @@ struct ContentView: View {
         Group {
             if completed && !adjusting {
                 Button(german ? "Einstellung starten" : "Начать регулировку") { beginAdjustment() }
-            } else if guided && !awaitingMovement && !zeroConfirmed {
-                Button(german ? "Nullpunkt" : "Установить ноль") { performZero() }
-                    .disabled(!model.stable)
-            } else if guided && !awaitingMovement && !measurementStarted {
-                Button(german ? "Messung starten" : "Начать измерение") { performStartMeasurement() }
             } else if !guided && !adjusting {
-                Button(german ? "Prüfung starten" : "Начать проверку") { beginGuided() }
+                Button(german ? "Neue Prüfung" : "Новое измерение") { beginGuided() }
             } else {
-                Text(adjusting ? (german ? "EINSTELLUNG" : "РЕГУЛИРОВКА") : (german ? "Messung läuft" : "Идёт измерение"))
+                Text(adjusting ? (german ? "EINSTELLUNG" : "РЕГУЛИРОВКА") :
+                     (german ? "Automatische Messung" : "Автоматический замер"))
                     .font(.caption.bold()).foregroundStyle(.cyan)
             }
         }
         .font(.system(size: 12, weight: .bold))
-        .buttonStyle(.borderedProminent)
-        .tint(.blue)
-        .lineLimit(2)
-        .minimumScaleFactor(0.75)
-        .frame(maxWidth: 170)
+        .buttonStyle(.borderedProminent).tint(.blue)
+        .lineLimit(2).minimumScaleFactor(0.75).frame(maxWidth: 170)
     }
 
     private func speak(_ message: String) {
@@ -528,34 +398,50 @@ struct ContentView: View {
         awaitingMovement = false
         zeroConfirmed = false
         measurementStarted = false
+        wheelPlacementArmed = true
+        zeroReference.removeAll()
+        model.newSession()
         mode = .camber
         model.setMode(.camber)
-        activeWheel = wheelOrder.first(where: { model.saved[$0] == nil })
+        activeWheel = .frontLeft
         if activeWheel == nil { guided = false; completed = true; return }
         wheel = activeWheel ?? .frontLeft
         model.resetSampling()
         if !model.running { model.start() }
-        speak(german ? "Telefon am linken Vorderrad befestigen. Nullpunkt prüfen." : "Установите телефон на переднее левое колесо. Проверьте установку нуля.")
+        speak(german ? "Telefon am linken Vorderrad befestigen. Nullpunkt prüfen." : "Установите телефон на переднее левое колесо. Держите неподвижно четыре секунды.")
     }
 
     private func advanceGuidedIfReady() {
-        guard guided, measurementStarted, zeroConfirmed, !awaitingMovement, model.stableSeconds >= 4,
-              let current = activeWheel else { return }
+        guard guided, !awaitingMovement, wheelPlacementArmed,
+              model.stableSeconds >= 4, let current = activeWheel,
+              let rawAngle = model.angle else { return }
+        wheelPlacementArmed = false
+        // A four-second stationary window is a stability check, not a
+        // physical wheel-angle zero: never subtract the wheel's own tilt.
+        zeroReference[current] = rawAngle
+        zeroConfirmed = true
+        measurementStarted = true
         model.save(current, guidedCapture: true)
-        guard model.saved[current] != nil else { return }
-        let next = wheelOrder.first(where: { model.saved[$0] == nil })
-        if let next {
+        guard model.saved[current] != nil else {
+            wheelPlacementArmed = true
+            return
+        }
+        if let next = wheelOrder.first(where: { model.saved[$0] == nil }) {
             activeWheel = next
             wheel = next
             awaitingMovement = true
-            measurementStarted = false
             zeroConfirmed = false
-            speak((german ? "Gespeichert. Telefon abnehmen und am nächsten Rad befestigen: " : "Измерение сохранено. Снимите телефон и установите на другое колесо: ") + next.label(german: german))
+            measurementStarted = false
+            model.resetSampling()
+            speak((german ? "Gespeichert. Telefon am nächsten Rad befestigen: " :
+                "Измерение сохранено. Снимите телефон и установите на следующее колесо: ") +
+                next.label(german: german))
         } else {
             guided = false
             completed = true
             activeWheel = nil
-            speak(german ? "Vier Messungen gespeichert. Ergebnisse prüfen." : "Четыре измерения сохранены. Проверьте результаты и нажмите Начать регулировку.")
+            speak(german ? "Vier Messungen gespeichert. Einstellung starten." :
+                "Измерение четырёх колёс завершено. Нажмите Начать регулировку.")
         }
     }
 
@@ -667,27 +553,9 @@ struct ContentView: View {
             if reading != nil {
                 Label(german ? "Fixiert" : "Сохранено", systemImage: "lock.fill")
                     .font(.system(size: 9)).foregroundStyle(.green)
-                Button(german ? "Wiederholen" : "Повторить") {
-                    wheel = item
-                    activeWheel = nil
-                    model.unlock(item)
-                }.font(.system(size: 10)).buttonStyle(.bordered)
             } else if activeWheel == item {
-                Button(german ? "Speichern" : "Сохранить") {
-                    model.save(item)
-                    if (mode == .camber ? model.saved[item] : model.toeSaved[item]) != nil {
-                        activeWheel = nil
-                    }
-                }
-                .font(.system(size: 10)).buttonStyle(.borderedProminent)
-                .disabled(!model.running || !model.stable || !model.correctPosition || model.angle == nil || !model.calibrated)
-            } else {
-                Button(german ? "Messung" : "Измерить") {
-                    wheel = item
-                    activeWheel = item
-                    model.resetSampling()
-                    if !model.running { model.start() }
-                }.font(.system(size: 10)).buttonStyle(.bordered)
+                Text(german ? "Automatisch" : "Автоматически")
+                    .font(.system(size: 9)).foregroundStyle(.cyan)
             }
         }
         .frame(maxWidth: .infinity)
