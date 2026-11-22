@@ -569,7 +569,7 @@ struct ContentView: View {
                 .frame(height: 28)
             Text(adjusting && activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : (reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—")))
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(adjusting && activeWheel == item ? ((model.liveAngle.map { abs($0) <= testTolerance } ?? false) ? Color.green : Color.orange) : wheelColor(item, reading: reading))
+                .foregroundStyle(adjusting && activeWheel == item ? ((model.liveAngle.map { abs($0) <= testTolerance } ?? false) ? Color.green : Color.red) : wheelColor(item, reading: reading))
                 .monospacedDigit()
             ZStack {
                 RoundedRectangle(cornerRadius: 15)
@@ -602,7 +602,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .padding(5)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(wheel == item ? 0.12 : 0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(adjusting && activeWheel == item ? .orange : (wheel == item ? .cyan : .gray.opacity(0.25))))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(adjusting && activeWheel == item ? .red : (wheel == item ? .cyan : .gray.opacity(0.25))))
 
     }
 
