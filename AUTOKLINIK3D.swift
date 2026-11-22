@@ -2,6 +2,7 @@ import AVFoundation
 import CoreMotion
 import Foundation
 import SwiftUI
+import Speech
 
 enum MeasurementMode: String, CaseIterable, Identifiable {
     case camber, toe
@@ -124,6 +125,14 @@ final class AlignmentModel: ObservableObject {
             toeSaved.removeAll()
             persistMeasurements()
         }
+        calibrated = true
+        resetSampling()
+    }
+
+    func calibrateKeepingMeasurements() {
+        guard stable, let angle else { return }
+        if mode == .camber { zero += angle; camberCalibrated = true }
+        else if let heading = motion.deviceMotion?.attitude.yaw { toeReference = heading; toeZero = heading }
         calibrated = true
         resetSampling()
     }
@@ -264,6 +273,95 @@ final class AlignmentModel: ObservableObject {
     }
 }
 
+
+enum SpokenCommand { case none, zero, start, next, begin, adjust }
+
+@MainActor
+final class VoiceCommandController: ObservableObject {
+    @Published private(set) var listening = false
+    @Published private(set) var lastHeard = ""
+    @Published private(set) var lastCommand: SpokenCommand = .none
+    @Published private(set) var commandSequence = 0
+    private let engine = AVAudioEngine()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var task: SFSpeechRecognitionTask?
+    private var lastProcessed = ""
+
+    func start(locale: String) {
+        guard !listening else { return }
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            Task { @MainActor in
+                guard status == .authorized else {
+                    self?.lastHeard = "Нет разрешения на распознавание речи"
+                    return
+                }
+                self?.begin(locale: locale)
+            }
+        }
+    }
+
+    private func begin(locale: String) {
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)), recognizer.isAvailable else {
+            lastHeard = "Распознавание речи недоступно"
+            return
+        }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
+            try session.setActive(true)
+            let input = engine.inputNode
+            let format = input.outputFormat(forBus: 0)
+            let req = SFSpeechAudioBufferRecognitionRequest()
+            req.shouldReportPartialResults = true
+            request = req
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+                req.append(buffer)
+            }
+            engine.prepare()
+            try engine.start()
+            listening = true
+            task = recognizer.recognitionTask(with: req) { [weak self] result, error in
+                Task { @MainActor in
+                    if let result {
+                        let words = result.bestTranscription.formattedString.lowercased()
+                        self?.lastHeard = words
+                        self?.process(words)
+                    }
+                    if error != nil || result?.isFinal == true { self?.stop() }
+                }
+            }
+        } catch {
+            lastHeard = "Ошибка микрофона: \(error.localizedDescription)"
+            stop()
+        }
+    }
+
+    private func process(_ words: String) {
+        guard words != lastProcessed else { return }
+        let command: SpokenCommand
+        if words.contains("установи ноль") || words.contains("установить ноль") || words.contains("nullpunkt") { command = .zero }
+        else if words.contains("начать измерение") || words.contains("начни измерение") || words.contains("messung starten") { command = .start }
+        else if words.contains("следующее колесо") || words.contains("nächstes rad") { command = .next }
+        else if words.contains("начать проверку") || words.contains("prüfung starten") { command = .begin }
+        else if words.contains("начать регулировку") || words.contains("einstellung starten") { command = .adjust }
+        else { return }
+        lastProcessed = words
+        lastCommand = command
+        commandSequence += 1
+    }
+
+    func stop() {
+        if engine.isRunning { engine.stop() }
+        engine.inputNode.removeTap(onBus: 0)
+        request?.endAudio()
+        task?.cancel()
+        task = nil
+        request = nil
+        listening = false
+        try? AVAudioSession.sharedInstance().setActive(false)
+    }
+}
+
 struct ContentView: View {
     @StateObject private var rolling = RollingCapture()
     @StateObject private var model = AlignmentModel()
@@ -278,89 +376,140 @@ struct ContentView: View {
     @State private var completed = false
     @State private var awaitingMovement = false
     @State private var speech = AVSpeechSynthesizer()
+    @StateObject private var voiceControl = VoiceCommandController()
+    @State private var zeroConfirmed = false
+    @State private var measurementStarted = false
     private let wheelOrder: [Wheel] = [.frontLeft, .frontRight, .rearLeft, .rearRight]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    Picker(german ? "Sprache" : "Язык", selection: $german) {
-                        Text("RU").tag(false)
-                        Text("DE").tag(true)
-                    }.pickerStyle(.segmented)
-                    Picker(german ? "Fahrzeug (Demo)" : "Автомобиль (тест)", selection: $selectedVehicle) {
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("AUTOKLINIK").font(.title2.bold()).foregroundStyle(.white)
+                        Text("3D").font(.title.bold()).foregroundStyle(.cyan)
+                        Spacer()
+                        Picker("Язык", selection: $german) {
+                            Text("RU").tag(false)
+                            Text("DE").tag(true)
+                        }.pickerStyle(.segmented).frame(width: 110)
+                    }
+                    Text(german ? "3D-ACHSVERMESSUNG · SENSORTEST" : "РАЗВАЛ · СХОЖДЕНИЕ · ТЕСТ ДАТЧИКОВ")
+                        .font(.caption.bold()).foregroundStyle(.cyan)
+                    Picker(german ? "Fahrzeug" : "Автомобиль", selection: $selectedVehicle) {
                         ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
                     }
-                    Text(german ? "Keine geprüften Herstellervorgaben hinterlegt" : "Заводские нормативы не подключены — только тест")
-                        .font(.caption).foregroundStyle(.orange)
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
                     }.pickerStyle(.segmented)
-                    Text(model.liveAngle.map(formatted) ?? "—")
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                    Text(status).font(.caption).foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(german ? "Rolltest (experimentell)" : "Тестовая прокатка").font(.headline)
-                        Text(rolling.phase == 1 ? (german ? "Erste Position stabil halten" : "Держи телефон неподвижно для первого замера") :
-                             rolling.phase == 2 ? (german ? "Fahrzeug langsam rollen und anhalten" : "Медленно прокати машину и останови") :
-                             rolling.phase == 3 ? (german ? "Zwei Positionen gespeichert" : "Два положения записаны") :
-                             (german ? "Bereit" : "Готов к тесту"))
-                        Button(german ? "Rolltest starten" : "Начать прокатку") { rolling.start() }
-                            .buttonStyle(.borderedProminent)
-                        if let first = rolling.first { Text("A: \\(formatted(first))") }
-                        if let second = rolling.second { Text("B: \\(formatted(second))") }
-                        if let difference = rolling.difference { Text((german ? "Differenz: " : "Разница: ") + formatted(difference)) }
-                        Text(german ? "Nur Sensortest, keine validierte Achsvermessung." : "Только тест датчика, не точное измерение развала или схождения.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }.padding(12)
-                    if guided || completed || adjusting {
-                        Text(completed ? (german ? "Prüfung abgeschlossen" : "Проверка завершена") : adjusting ? (german ? "Einstellmodus" : "Режим регулировки") : (german ? "Automatische Prüfung" : "Автоматическая проверка"))
-                            .font(.headline)
-                        if guided {
-                            Text(activeWheel?.label(german: german) ?? "—")
-                            Text(awaitingMovement ? (german ? "Telefon abnehmen und zum nächsten Rad bewegen" : "Снимите телефон и перенесите на следующее колесо") : (german ? "Vier Sekunden ruhig halten" : "Держите неподвижно 4 секунды"))
-                            Text(String(format: "%.1f / 4.0 s", model.stableSeconds))
-                        }
-                        if completed && !adjusting {
-                            Button(german ? "Einstellung starten" : "Начать регулировку") { adjusting = true; completed = false; speak(german ? "Einstellung starten" : "Начните регулировку") }
-                                .buttonStyle(.borderedProminent)
-                        }
-                    }
-                    carDiagram
-                    if !guided && !completed && !adjusting {
-                        Button(german ? "Automatische Prüfung starten" : "Начать автоматическую проверку") { beginGuided() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    Text(german ? "Farben: Türkis = gespeichert, keine OEM-Bewertung. Grün/Rot erst mit geprüften Sollwerten." : "Цвета: голубой — замер сохранён, оценка по заводу недоступна. Зелёный/красный — только с проверенными нормативами.")
-                        .font(.caption).foregroundStyle(.secondary)
                     HStack {
-                        Button(model.running ? (german ? "Stoppen" : "Остановить") : (german ? "Starten" : "Начать")) {
-                            model.running ? model.stop() : model.start()
-                        }
+                        Image(systemName: "waveform").foregroundStyle(.cyan)
+                        Text(voiceControl.listening ? (german ? "Sprachsteuerung aktiv" : "Голосовое управление включено") : (german ? "Sprachsteuerung aus" : "Голосовое управление выключено"))
+                            .font(.caption)
                         Spacer()
-                        Button(german ? "Nullpunkt" : "Установить ноль") { model.calibrate() }
-                            .disabled(!model.stable)
-                    }.buttonStyle(.borderedProminent)
-                    Text(german
-                         ? "Testmessung: Spur ist nicht für eine professionelle Achsvermessung validiert."
-                         : "Тестовый режим: точность схождения для профессионального сход-развала не подтверждена.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                .padding()
+                        Button(voiceControl.listening ? (german ? "Aus" : "Выключить") : (german ? "Mikrofon" : "Микрофон")) {
+                            if voiceControl.listening { voiceControl.stop() }
+                            else { voiceControl.start(locale: german ? "de-DE" : "ru-RU") }
+                        }.buttonStyle(.bordered)
+                    }
+                    Text(voiceControl.lastHeard.isEmpty ? (german ? "Befehle: Nullpunkt, Messung starten, nächstes Rad" : "Команды: установить ноль, начать измерение, следующее колесо") : voiceControl.lastHeard)
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Text(german ? "Nur Sensortest — Spurwerte nicht validiert" : "Тест датчиков: точность схождения не подтверждена")
+                        .font(.caption).foregroundStyle(.orange)
+                    Text(guided ? (activeWheel?.label(german: german) ?? "") : completed ? (german ? "Messungen abgeschlossen" : "Проверка завершена") : adjusting ? (german ? "Einstellmodus" : "Режим регулировки") : (german ? "Bereit zur Prüfung" : "Готово к проверке"))
+                        .font(.headline).foregroundStyle(.white)
+                    Text(model.liveAngle.map(formatted) ?? "—")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(.cyan).monospacedDigit()
+                    carDiagram
+                    if guided {
+                        Text(awaitingMovement ? (german ? "Telefon zum nächsten Rad bewegen" : "Перенесите телефон на следующее колесо") : !zeroConfirmed ? (german ? "Nullpunkt setzen" : "Установите ноль") : !measurementStarted ? (german ? "Messung starten" : "Начните измерение") : (german ? "Vier Sekunden stabil halten" : "Держите неподвижно четыре секунды"))
+                            .font(.callout)
+                        if measurementStarted { Text(String(format: "%.1f / 4.0 s", model.stableSeconds)).monospacedDigit() }
+                    }
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    Text(german ? "Türkis: gespeichert; keine Bewertung ohne geprüfte Sollwerte." : "Голубой: сохранено. Без заводских допусков оценка недоступна.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }.padding(14)
             }
-            .navigationTitle("AUTOKLINIK 3D")
-        .preferredColorScheme(.dark)
+            .background(
+                LinearGradient(colors: [Color(red: 0.015, green: 0.055, blue: 0.11), .black, Color(red: 0.015, green: 0.09, blue: 0.17)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+            )
+            .navigationBarHidden(true)
+            .preferredColorScheme(.dark)
         }
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: model.stableSeconds) { _ in advanceGuidedIfReady() }
         .onChange(of: model.movementDetected) { moving in
-            if guided && awaitingMovement && moving { awaitingMovement = false; model.resetSampling() }
+            if guided && awaitingMovement && moving {
+                awaitingMovement = false
+                zeroConfirmed = false
+                measurementStarted = false
+                model.resetSampling()
+                speak((german ? "Telefon befestigen und Nullpunkt setzen: " : "Закрепите телефон и установите ноль: ") + (activeWheel?.label(german: german) ?? ""))
+            }
+        }
+        .onChange(of: voiceControl.commandSequence) { _ in
+            switch voiceControl.lastCommand {
+            case .zero: performZero()
+            case .start: performStartMeasurement()
+            case .next: if awaitingMovement { awaitingMovement = false; zeroConfirmed = false; measurementStarted = false; model.resetSampling() }
+            case .begin: if !guided && !completed && !adjusting { beginGuided() }
+            case .adjust: if completed { beginAdjustment() }
+            case .none: break
+            }
         }
         .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
         .onChange(of: scenePhase) { phase in
-            if phase != .active { model.stop(); rolling.stop() }
+            if phase != .active { model.stop(); rolling.stop(); voiceControl.stop() }
         }
+    }
+
+    private func performZero() {
+        guard guided, !awaitingMovement, !zeroConfirmed, model.stable else { return }
+        // Calibrate the mount once per session; never erase previously saved wheel readings.
+        if !model.calibrated { model.calibrateKeepingMeasurements() }
+        zeroConfirmed = true
+        speak(german ? "Nullpunkt gesetzt. Messung starten." : "Ноль установлен. Начните измерение.")
+    }
+
+    private func performStartMeasurement() {
+        guard guided, zeroConfirmed, !awaitingMovement else { return }
+        measurementStarted = true
+        model.resetSampling()
+        speak(german ? "Messung läuft. Vier Sekunden ruhig halten." : "Измерение началось. Держите телефон неподвижно четыре секунды.")
+    }
+
+    private func beginAdjustment() {
+        guard completed else { return }
+        adjusting = true
+        completed = false
+        speak(german ? "Einstellmodus. Ausgangswerte gespeichert." : "Режим регулировки. Исходные измерения сохранены.")
+    }
+
+    private var centerAction: some View {
+        Group {
+            if completed && !adjusting {
+                Button(german ? "Einstellung starten" : "Начать регулировку") { beginAdjustment() }
+            } else if guided && !awaitingMovement && !zeroConfirmed {
+                Button(german ? "Nullpunkt" : "Установить ноль") { performZero() }
+                    .disabled(!model.stable)
+            } else if guided && !awaitingMovement && !measurementStarted {
+                Button(german ? "Messung starten" : "Начать измерение") { performStartMeasurement() }
+            } else if !guided && !adjusting {
+                Button(german ? "Prüfung starten" : "Начать проверку") { beginGuided() }
+            } else {
+                Text(adjusting ? (german ? "EINSTELLUNG" : "РЕГУЛИРОВКА") : (german ? "Messung läuft" : "Идёт измерение"))
+                    .font(.caption.bold()).foregroundStyle(.cyan)
+            }
+        }
+        .font(.system(size: 12, weight: .bold))
+        .buttonStyle(.borderedProminent)
+        .tint(.blue)
+        .lineLimit(2)
+        .minimumScaleFactor(0.75)
+        .frame(maxWidth: 170)
     }
 
     private func speak(_ message: String) {
@@ -375,6 +524,8 @@ struct ContentView: View {
         completed = false
         adjusting = false
         awaitingMovement = false
+        zeroConfirmed = false
+        measurementStarted = false
         mode = .camber
         model.setMode(.camber)
         activeWheel = wheelOrder.first(where: { model.saved[$0] == nil })
@@ -386,7 +537,7 @@ struct ContentView: View {
     }
 
     private func advanceGuidedIfReady() {
-        guard guided, !awaitingMovement, model.stableSeconds >= 4,
+        guard guided, measurementStarted, zeroConfirmed, !awaitingMovement, model.stableSeconds >= 4,
               let current = activeWheel else { return }
         model.save(current, guidedCapture: true)
         guard model.saved[current] != nil else { return }
@@ -395,6 +546,8 @@ struct ContentView: View {
             activeWheel = next
             wheel = next
             awaitingMovement = true
+            measurementStarted = false
+            zeroConfirmed = false
             speak((german ? "Gespeichert. Telefon abnehmen und am nächsten Rad befestigen: " : "Измерение сохранено. Снимите телефон и установите на другое колесо: ") + next.label(german: german))
         } else {
             guided = false
@@ -407,27 +560,37 @@ struct ContentView: View {
     private var carDiagram: some View {
         VStack(spacing: 12) {
             Text(german ? "VORDERACHSE" : "ПЕРЕДНЯЯ ОСЬ")
-                .font(.caption.bold()).foregroundStyle(.secondary)
-            HStack(alignment: .center, spacing: 10) {
+                .font(.caption.bold()).foregroundStyle(.cyan.opacity(0.8))
+            HStack(alignment: .center, spacing: 5) {
                 wheelTile(.frontLeft)
                 axleReadout(front: true)
                 wheelTile(.frontRight)
             }
-            Image(systemName: "car.top.door.front.left.open")
-                .font(.system(size: 75, weight: .ultraLight))
-                .foregroundStyle(.cyan.opacity(0.75))
-                .frame(height: 110)
-            HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 38)
+                    .fill(LinearGradient(colors: [Color(red: 0.06, green: 0.22, blue: 0.36), Color(red: 0.01, green: 0.06, blue: 0.12)], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 145, height: 225)
+                    .overlay(RoundedRectangle(cornerRadius: 38).stroke(.cyan.opacity(0.6), lineWidth: 2))
+                VStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 15).fill(.black.opacity(0.55))
+                        .frame(width: 112, height: 54)
+                    centerAction
+                    RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.5))
+                        .frame(width: 112, height: 43)
+                }
+            }
+            .frame(height: 235)
+            HStack(alignment: .center, spacing: 5) {
                 wheelTile(.rearLeft)
                 axleReadout(front: false)
                 wheelTile(.rearRight)
             }
             Text(german ? "HINTERACHSE" : "ЗАДНЯЯ ОСЬ")
-                .font(.caption.bold()).foregroundStyle(.secondary)
+                .font(.caption.bold()).foregroundStyle(.cyan.opacity(0.8))
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color.black))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.gray.opacity(0.35)))
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color(red: 0.015, green: 0.07, blue: 0.13)))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.cyan.opacity(0.35)))
     }
 
     // Only a verified vehicle-specific reference can classify a wheel as good or bad.
@@ -529,7 +692,7 @@ struct ContentView: View {
         .padding(5)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(wheel == item ? 0.12 : 0.04)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(wheel == item ? .cyan : .gray.opacity(0.25)))
-        .onTapGesture { wheel = item; activeWheel = item; model.resetSampling(); if !model.running { model.start() } }
+
     }
 
     private var levelView: some View {
