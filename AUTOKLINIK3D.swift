@@ -304,6 +304,8 @@ struct ContentView: View {
     @State private var wheel = Wheel.frontLeft
     @State private var mode = MeasurementMode.camber
     @State private var selectedVehicle = "VW Golf 7"
+    @State private var documentConfirmed = false
+    @State private var documentSummary = ""
     @State private var activeWheel: Wheel?
     @State private var guided = false
     @State private var adjusting = false
@@ -331,8 +333,14 @@ struct ContentView: View {
                     }
                     Text(german ? "3D-ACHSVERMESSUNG · SENSORTEST" : "РАЗВАЛ · СХОЖДЕНИЕ · ТЕСТ ДАТЧИКОВ")
                         .font(.caption.bold()).foregroundStyle(.cyan)
-                    NavigationLink(german ? "Fahrzeugschein fotografieren" : "Фото техпаспорта · подбор автомобиля") { FahrzeugscheinScannerScreen() }
+                    NavigationLink(german ? "Fahrzeugschein fotografieren" : "Фото техпаспорта · подбор автомобиля") { FahrzeugscheinScannerScreen(onConfirm: { summary in
+                        documentSummary = summary
+                        documentConfirmed = true
+                    }) }
+                    if documentConfirmed { Text(documentSummary).font(.caption).foregroundStyle(.green) }
+                    else { Text(german ? "Schritt 1: Dokument prüfen, danach Sensortest" : "Этап 1: фото и проверка данных, затем тест измерений").font(.caption).foregroundStyle(.orange) }
                         .font(.callout.bold())
+                    if documentConfirmed {
                     Picker(german ? "Fahrzeug" : "Автомобиль", selection: $selectedVehicle) {
                         ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
                     }
@@ -347,6 +355,7 @@ struct ContentView: View {
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(.cyan).monospacedDigit()
                     carDiagram
+                    }
                     if guided {
                         Text(awaitingMovement ? (german ? "Telefon zum nächsten Rad bewegen" : "Перенесите телефон на следующее колесо") : (german ? "Vier Sekunden stabil halten" : "Держите неподвижно четыре секунды"))
                             .font(.callout)
@@ -385,8 +394,9 @@ struct ContentView: View {
             .preferredColorScheme(.dark)
         }
         .onAppear {
-            if !guided && !completed && !adjusting { beginGuided() }
+            if documentConfirmed && !guided && !completed && !adjusting { beginGuided() }
         }
+        .onChange(of: documentConfirmed) { confirmed in if confirmed { beginGuided() } }
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: model.stableSeconds) { _ in advanceGuidedIfReady() }
         .onChange(of: model.movementDetected) { moving in
@@ -683,10 +693,12 @@ struct AUTOKLINIK3DApp: App {
 
 // MARK: - Fahrzeugschein photo identification (offline; unverified matching is prohibited)
 struct FahrzeugscheinScannerScreen: View {
+    let onConfirm: (String) -> Void
     @State private var showingCamera = false
     @State private var fields: [String: String] = [:]
     @State private var processing = false
     @State private var errorText: String?
+    @State private var manuallyConfirmed = false
     var body: some View {
         Form {
             Section("Zulassungsbescheinigung Teil I") {
@@ -697,7 +709,7 @@ struct FahrzeugscheinScannerScreen: View {
             }
             if !fields.isEmpty {
                 Section("Распознано — проверьте по документу") {
-                    ForEach(["E", "2.1", "2.2", "B", "D.1", "D.3"], id: \.self) { field in
+                    ForEach(["E", "2.1", "2.2", "B", "D.1", "D.2", "D.3", "K", "P.1", "P.2"], id: \.self) { field in
                         HStack {
                             Text(field)
                             Spacer()
@@ -705,8 +717,13 @@ struct FahrzeugscheinScannerScreen: View {
                         }
                     }
                 }
-                Section("Заводские параметры") {
-                    Text("Автоподбор отключён до проверки HSN/TSN, VIN и варианта подвески. Углы не подставляются без подтверждения.")
+                Section("Проверка автомобиля") {
+                    Text("Заводские углы пока не подтверждены. Сверьте VIN, HSN/TSN и тип подвески с документом. Измерения — только тест, не регулировка по заводским допускам.")
+                    Toggle("Я сверил данные с техпаспортом", isOn: $manuallyConfirmed)
+                    Button("Перейти к измерениям (тест)") {
+                        let summary = [fields["D.1"], fields["D.3"], fields["E"]].compactMap { $0 }.joined(separator: " · ")
+                        onConfirm(summary)
+                    }.disabled(!manuallyConfirmed || fields["E"] == nil)
                 }
             }
         }
@@ -725,7 +742,7 @@ struct FahrzeugscheinScannerScreen: View {
                         try VNImageRequestHandler(cgImage: cg).perform([request])
                         let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
                         let parsed = FahrzeugscheinFields.parse(lines)
-                        await MainActor.run { fields = parsed; processing = false; errorText = nil }
+                        await MainActor.run { fields = parsed; manuallyConfirmed = false; processing = false; errorText = nil }
                     } catch {
                         await MainActor.run { processing = false; errorText = error.localizedDescription }
                     }
@@ -738,7 +755,7 @@ struct FahrzeugscheinScannerScreen: View {
 private enum FahrzeugscheinFields {
     static func parse(_ lines: [String]) -> [String: String] {
         var output: [String: String] = [:]
-        let keys = ["2.1", "2.2", "D.1", "D.3", "E", "B"]
+        let keys = ["2.1", "2.2", "D.1", "D.2", "D.3", "E", "B", "K", "P.1", "P.2"]
         for (i, raw) in lines.enumerated() {
             let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             for key in keys where output[key] == nil {
