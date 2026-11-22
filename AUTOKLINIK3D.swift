@@ -345,6 +345,9 @@ struct ContentView: View {
             .navigationBarHidden(true)
             .preferredColorScheme(.dark)
         }
+        .onAppear {
+            if !guided && !completed && !adjusting { beginGuided() }
+        }
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: model.stableSeconds) { _ in advanceGuidedIfReady() }
         .onChange(of: model.movementDetected) { moving in
