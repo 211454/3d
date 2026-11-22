@@ -32,6 +32,7 @@ final class AlignmentModel: ObservableObject {
     @Published private(set) var stable = false
     @Published private(set) var calibrated = false
     @Published private(set) var correctPosition = false
+    @Published private(set) var movementDetected = false
     @Published private(set) var saved: [Wheel: Double] = [:]
     @Published private(set) var toeSaved: [Wheel: Double] = [:]
     @Published private(set) var mode: MeasurementMode = .camber
@@ -134,10 +135,10 @@ final class AlignmentModel: ObservableObject {
         resetSampling()
     }
 
-    func save(_ wheel: Wheel) {
+    func save(_ wheel: Wheel, guidedCapture: Bool = false) {
         guard (mode == .camber ? saved[wheel] : toeSaved[wheel]) == nil else { return }
 
-        guard running, calibrated, correctPosition, let angle, angle.isFinite else { return }
+        guard running, (calibrated || guidedCapture), correctPosition, stable, let angle, angle.isFinite else { return }
         if mode == .camber { saved[wheel] = angle } else { toeSaved[wheel] = angle }
         persistMeasurements()
         resetSampling()
@@ -166,6 +167,7 @@ final class AlignmentModel: ObservableObject {
         correctPosition = hypot(gravity.x, gravity.y) > 0.75
         let rotation = sample.rotationRate
         let acceleration = sample.userAcceleration
+        movementDetected = hypot(hypot(rotation.x, rotation.y), rotation.z) >= 0.15 || hypot(hypot(acceleration.x, acceleration.y), acceleration.z) >= 0.12
         guard correctPosition,
               hypot(hypot(rotation.x, rotation.y), rotation.z) < 0.15,
               hypot(hypot(acceleration.x, acceleration.y), acceleration.z) < 0.12 else {
@@ -352,8 +354,8 @@ struct ContentView: View {
         }
         .onChange(of: wheel) { _ in model.resetSampling() }
         .onChange(of: model.stableSeconds) { _ in advanceGuidedIfReady() }
-        .onChange(of: model.correctPosition) { correct in
-            if guided && awaitingMovement && !correct { awaitingMovement = false; model.resetSampling() }
+        .onChange(of: model.movementDetected) { moving in
+            if guided && awaitingMovement && moving { awaitingMovement = false; model.resetSampling() }
         }
         .onChange(of: mode) { value in activeWheel = nil; model.setMode(value) }
         .onChange(of: scenePhase) { phase in
@@ -375,8 +377,9 @@ struct ContentView: View {
         awaitingMovement = false
         mode = .camber
         model.setMode(.camber)
-        activeWheel = wheelOrder.first
-        wheel = .frontLeft
+        activeWheel = wheelOrder.first(where: { model.saved[$0] == nil })
+        if activeWheel == nil { guided = false; completed = true; return }
+        wheel = activeWheel ?? .frontLeft
         model.resetSampling()
         if !model.running { model.start() }
         speak(german ? "Telefon am linken Vorderrad befestigen. Nullpunkt prüfen." : "Установите телефон на переднее левое колесо. Проверьте установку нуля.")
@@ -384,8 +387,8 @@ struct ContentView: View {
 
     private func advanceGuidedIfReady() {
         guard guided, !awaitingMovement, model.stableSeconds >= 4,
-              model.calibrated, let current = activeWheel else { return }
-        model.save(current)
+              let current = activeWheel else { return }
+        model.save(current, guidedCapture: true)
         guard model.saved[current] != nil else { return }
         let next = wheelOrder.first(where: { model.saved[$0] == nil })
         if let next {
