@@ -833,6 +833,20 @@ private struct FactoryAlignmentEntry {
 private enum FactoryAlignmentDatabase {
     // Intentionally empty until authoritative variant-specific records and
     // VIN/HSN/TSN mappings are validated. Never fabricate factory limits.
+    // Vehicle discovery catalog only. Factory alignment values still require
+    // verified records for the exact suspension and vehicle variant.
+    static let modelYearThrough = 2020
+    static let volkswagenModels = [
+        "up!", "Polo", "Golf", "Golf Plus", "Golf Sportsvan",
+        "Jetta", "Bora", "Passat", "Arteon", "Scirocco",
+        "Beetle", "New Beetle", "Touran", "Sharan", "Tiguan",
+        "Touareg", "T-Roc", "T-Cross", "Caddy", "Transporter",
+        "Multivan", "Caravelle", "California", "Crafter", "Amarok"
+    ]
+    static let audiModels = [
+        "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8",
+        "Q2", "Q3", "Q5", "Q7", "Q8", "TT", "R8"
+    ]
     static let verified: [FactoryAlignmentEntry] = []
 
     static func find(fields: [String: String], suspensionCode: String) -> FactoryAlignmentEntry? {
