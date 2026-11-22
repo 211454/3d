@@ -91,7 +91,7 @@ final class AlignmentModel: ObservableObject {
         resetSampling()
         lastTimestamp = nil
         motion.deviceMotionUpdateInterval = 0.05
-        motion.startDeviceMotionUpdates()
+        motion.startDeviceMotionUpdates(using: .xArbitraryZVertical)
         running = true
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.readMotion() }
@@ -172,13 +172,13 @@ final class AlignmentModel: ObservableObject {
         let gravity = sample.gravity
         let raw = mode == .camber
             ? atan2(gravity.x, -gravity.y) * 180 / .pi
-            : atan2(sin(sample.attitude.yaw - toeZero), cos(sample.attitude.yaw - toeZero)) * 180 / .pi
+            : -atan2(sin(sample.attitude.yaw - toeZero), cos(sample.attitude.yaw - toeZero)) * 180 / .pi
         guard raw.isFinite else { return }
         let offset = mode == .camber ? zero : 0
         let measured = mode == .camber ? raw - offset : raw
         liveAngle = measured
-        // Portrait, top edge up, screen facing away from the vehicle.
-        correctPosition = hypot(gravity.x, gravity.y) > 0.75
+        // Camber: upright phone. Toe: phone flat, screen facing up.
+        correctPosition = mode == .camber ? hypot(gravity.x, gravity.y) > 0.75 : gravity.z < -0.85
         let rotation = sample.rotationRate
         let acceleration = sample.userAcceleration
         movementDetected = hypot(hypot(rotation.x, rotation.y), rotation.z) >= 0.15 || hypot(hypot(acceleration.x, acceleration.y), acceleration.z) >= 0.12
