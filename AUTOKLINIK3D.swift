@@ -303,7 +303,9 @@ struct ContentView: View {
     @AppStorage("alignmentGerman") private var german = false
     @State private var wheel = Wheel.frontLeft
     @State private var mode = MeasurementMode.camber
-    @State private var selectedVehicle = "VW Golf 7"
+    @State private var selectedVehicle = "VW Passat B6"
+    @State private var passatSuspension: PassatB6Suspension = .standard
+    @State private var confirmedPassatVariant = false
     @State private var documentConfirmed = false
     @State private var documentSummary = ""
     @State private var activeWheel: Wheel?
@@ -335,6 +337,9 @@ struct ContentView: View {
                         .font(.caption.bold()).foregroundStyle(.cyan)
                     NavigationLink(german ? "Fahrzeugschein fotografieren" : "Фото техпаспорта · подбор автомобиля") { FahrzeugscheinScannerScreen(onConfirm: { summary in
                         documentSummary = summary
+                        if summary.uppercased().contains("PASSAT") {
+                            selectedVehicle = "VW Passat B6"
+                        }
                         documentConfirmed = true
                     }) }
                     if documentConfirmed { Text(documentSummary).font(.caption).foregroundStyle(.green) }
@@ -342,6 +347,32 @@ struct ContentView: View {
                     if documentConfirmed {
                     Picker(german ? "Fahrzeug" : "Автомобиль", selection: $selectedVehicle) {
                         ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
+                    }
+                    if selectedVehicle == "VW Passat B6" {
+                        Picker(german ? "Fahrwerk (PR-Code)" : "Подвеска (PR-код)", selection: $passatSuspension) {
+                            ForEach(PassatB6Suspension.allCases) { item in
+                                Text(item.title(german: german)).tag(item)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("VW Passat B6 · 2008 · " + passatSuspension.title(german: german))
+                                .font(.caption.bold()).foregroundStyle(.cyan)
+                            Text("PR: " + passatSuspension.prCodes).font(.caption2)
+                            Text((german ? "Vorn Sturz: " : "Передний развал: ") +
+                                 formatted(passatSuspension.frontCamberDegrees) + " ±0°30′")
+                            Text((german ? "Hinten Sturz: " : "Задний развал: ") +
+                                 formatted(passatSuspension.rearCamberDegrees) + " ±0°30′")
+                            Text(german ? "Spur je Achse gesamt: +0°10′ ±0°10′" :
+                                 "Схождение каждой оси, суммарное: +0°10′ ±0°10′")
+                            Text(german ? "Nur Referenz, PR-Code am Fahrzeug bestätigen. Spur-Sensortest nicht validiert." :
+                                 "Справочные данные. Подтвердите PR-код автомобиля. Измерение схождения датчиком пока не проверено.")
+                                .foregroundStyle(.orange).font(.caption2)
+                            Toggle(german ? "Fahrwerk-PR-Code geprüft" : "PR-код подвески проверен",
+                                   isOn: $confirmedPassatVariant).font(.caption2)
+                        }
+                        .font(.caption2)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
                     }
                     Picker(german ? "Messung" : "Измерение", selection: $mode) {
                         ForEach(MeasurementMode.allCases) { item in Text(item.label(german)).tag(item) }
@@ -406,6 +437,8 @@ struct ContentView: View {
             }
         }
         .onChange(of: mode) { value in model.setMode(value) }
+        .onChange(of: selectedVehicle) { _ in confirmedPassatVariant = false }
+        .onChange(of: passatSuspension) { _ in confirmedPassatVariant = false }
         .onChange(of: scenePhase) { phase in
             if phase != .active { model.stop(); rolling.stop() }
         }
@@ -414,12 +447,26 @@ struct ContentView: View {
     private let testTolerance = 1.0 // TEST ONLY: not a factory specification
 
     private var adjustmentTarget: Wheel? {
-        wheelOrder.filter { abs((mode == .toe ? model.toeSaved : model.saved)[$0] ?? 0) > testTolerance }
-            .max { abs((mode == .toe ? model.toeSaved : model.saved)[$0] ?? 0) < abs((mode == .toe ? model.toeSaved : model.saved)[$1] ?? 0) }
+        guard selectedVehicle == "VW Passat B6", confirmedPassatVariant, mode == .camber else { return nil }
+        return wheelOrder.filter { item in
+            guard let measured = model.saved[item] else { return false }
+            return abs(measured - PassatB6Specs.target(for: item, mode: mode, suspension: passatSuspension)) > PassatB6Specs.camberToleranceDegrees
+        }.max { a, b in
+            let aValue = abs((model.saved[a] ?? 0) - PassatB6Specs.target(for: a, mode: mode, suspension: passatSuspension))
+            let bValue = abs((model.saved[b] ?? 0) - PassatB6Specs.target(for: b, mode: mode, suspension: passatSuspension))
+            return aValue < bValue
+        }
     }
 
     private func beginAdjustment() {
         guard completed else { return }
+        // A single-device yaw experiment cannot support factory toe adjustment.
+        guard mode != .toe else {
+            adjusting = false
+            speak(german ? "Spurwerte gespeichert. Keine automatische Einstellung im Sensortest." :
+                           "Схождение сохранено. Автоматическая регулировка в тесте датчиков отключена.")
+            return
+        }
         adjusting = true
         completed = false
         activeWheel = adjustmentTarget
@@ -550,6 +597,12 @@ struct ContentView: View {
     // Only a verified vehicle-specific reference can classify a wheel as good or bad.
     private func wheelColor(_ item: Wheel, reading: Double?) -> Color {
         guard let reading else { return .white }
+        if selectedVehicle == "VW Passat B6" {
+            // Do not mark toe as OEM-pass/fail: toe capture is still experimental.
+            guard confirmedPassatVariant, mode == .camber else { return .cyan }
+            let target = PassatB6Specs.target(for: item, mode: mode, suspension: passatSuspension)
+            return abs(reading - target) <= PassatB6Specs.camberToleranceDegrees ? .green : .red
+        }
         guard let reference = AlignmentDemoCatalog.verifiedReference(for: selectedVehicle, vin: nil) else { return .cyan }
         let range: ClosedRange<Double> = {
             switch (mode, item) {
@@ -577,6 +630,16 @@ struct ContentView: View {
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(.cyan)
                 .monospacedDigit()
+            if selectedVehicle == "VW Passat B6" && mode == .toe {
+                Text(german ? "Soll Gesamtspur" : "Эталон оси")
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
+                Text(formatted(PassatB6Specs.toeAxleTotalDegrees))
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.orange)
+                if let sum {
+                    Text("Δ " + formatted(sum - PassatB6Specs.toeAxleTotalDegrees))
+                        .font(.system(size: 10)).foregroundStyle(.cyan)
+                }
+            }
             Capsule().fill(Color.gray.opacity(0.5)).frame(height: 5)
                 .overlay(Circle().fill(.green).frame(width: 10, height: 10))
             Text(mode == .toe ? (german ? "Spur TEST" : "Схождение ТЕСТ") :
@@ -589,16 +652,31 @@ struct ContentView: View {
 
     private func wheelTile(_ item: Wheel) -> some View {
         let reading = mode == .camber ? model.saved[item] : model.toeSaved[item]
+        let referenceTarget: Double? = selectedVehicle == "VW Passat B6"
+            ? PassatB6Specs.target(for: item, mode: mode, suspension: passatSuspension)
+            : nil
         return VStack(spacing: 7) {
             Text(item.label(german: german))
                 .font(.system(size: 10, weight: .semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(height: 28)
+            Text(german ? (mode == .toe ? "Soll (½ Achse)" : "Soll") : (mode == .toe ? "Эталон (½ оси)" : "Эталон"))
+                .font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(referenceTarget.map(formatted) ?? "—")
+                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.orange)
+                .monospacedDigit()
+            Text(german ? "Ist" : "Наш")
+                .font(.system(size: 9)).foregroundStyle(.secondary)
             Text(adjusting && activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : (reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—")))
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(adjusting && activeWheel == item ? ((model.liveAngle.map { abs($0) <= testTolerance } ?? false) ? Color.green : Color.red) : wheelColor(item, reading: reading))
+                .foregroundStyle(wheelColor(item, reading: reading))
                 .monospacedDigit()
+            if let reading, let target = referenceTarget {
+                Text("Δ " + formatted(reading - target))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.cyan).monospacedDigit()
+            }
             ZStack {
                 RoundedRectangle(cornerRadius: 15)
                     .fill(LinearGradient(colors: [.gray.opacity(0.85), .black, .gray.opacity(0.65)], startPoint: .leading, endPoint: .trailing))
