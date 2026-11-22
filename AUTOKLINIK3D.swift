@@ -383,11 +383,28 @@ struct ContentView: View {
         }
     }
 
+    private let testTolerance = 1.0 // TEST ONLY: not a factory specification
+
+    private var adjustmentTarget: Wheel? {
+        wheelOrder.filter { abs(model.saved[$0] ?? 0) > testTolerance }
+            .max { abs(model.saved[$0] ?? 0) < abs(model.saved[$1] ?? 0) }
+    }
+
     private func beginAdjustment() {
         guard completed else { return }
         adjusting = true
         completed = false
-        speak(german ? "Einstellmodus. Ausgangswerte gespeichert." : "Режим регулировки. Исходные измерения сохранены.")
+        activeWheel = adjustmentTarget
+        if let target = activeWheel {
+            wheel = target
+            model.resetSampling()
+            if !model.running { model.start() }
+            speak((german ? "Telefon am Rad befestigen und Einstellung beginnen: " :
+                "Установите телефон на колесо и начните регулировку: ") + target.label(german: german))
+        } else {
+            speak(german ? "Alle Messwerte innerhalb der Testtoleranz." :
+                "Все измерения в пределах тестового допуска.")
+        }
     }
 
     private var centerAction: some View {
@@ -550,9 +567,9 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(height: 28)
-            Text(reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—"))
+            Text(adjusting && activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : (reading.map(formatted) ?? (activeWheel == item ? (model.liveAngle.map(formatted) ?? "—") : "—")))
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(wheelColor(item, reading: reading))
+                .foregroundStyle(adjusting && activeWheel == item ? ((model.liveAngle.map { abs($0) <= testTolerance } ?? false) ? Color.green : Color.orange) : wheelColor(item, reading: reading))
                 .monospacedDigit()
             ZStack {
                 RoundedRectangle(cornerRadius: 15)
@@ -571,7 +588,10 @@ struct ContentView: View {
             }
             .frame(width: 56, height: 100)
             .overlay(RoundedRectangle(cornerRadius: 15).stroke(reading != nil ? wheelColor(item, reading: reading) : .gray, lineWidth: 2))
-            if reading != nil {
+            if adjusting && activeWheel == item {
+                Text((german ? "Start: " : "Было: ") + (reading.map(formatted) ?? "—"))
+                    .font(.system(size: 9)).foregroundStyle(.orange)
+            } else if reading != nil {
                 Label(german ? "Fixiert" : "Сохранено", systemImage: "lock.fill")
                     .font(.system(size: 9)).foregroundStyle(.green)
             } else if activeWheel == item {
@@ -582,7 +602,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .padding(5)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(wheel == item ? 0.12 : 0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(wheel == item ? .cyan : .gray.opacity(0.25)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(adjusting && activeWheel == item ? .orange : (wheel == item ? .cyan : .gray.opacity(0.25))))
 
     }
 
