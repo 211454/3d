@@ -2,6 +2,8 @@ import AVFoundation
 import CoreMotion
 import Foundation
 import SwiftUI
+import Vision
+import UIKit
 
 enum MeasurementMode: String, CaseIterable, Identifiable {
     case camber, toe
@@ -329,6 +331,8 @@ struct ContentView: View {
                     }
                     Text(german ? "3D-ACHSVERMESSUNG · SENSORTEST" : "РАЗВАЛ · СХОЖДЕНИЕ · ТЕСТ ДАТЧИКОВ")
                         .font(.caption.bold()).foregroundStyle(.cyan)
+                    NavigationLink(german ? "Fahrzeugschein fotografieren" : "Фото техпаспорта · подбор автомобиля") { FahrzeugscheinScannerScreen() }
+                        .font(.callout.bold())
                     Picker(german ? "Fahrzeug" : "Автомобиль", selection: $selectedVehicle) {
                         ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
                     }
@@ -673,5 +677,105 @@ struct ContentView: View {
 struct AUTOKLINIK3DApp: App {
     var body: some Scene {
         WindowGroup { ContentView() }
+    }
+}
+
+
+// MARK: - Fahrzeugschein photo identification (offline; unverified matching is prohibited)
+struct FahrzeugscheinScannerScreen: View {
+    @State private var showingCamera = false
+    @State private var fields: [String: String] = [:]
+    @State private var processing = false
+    @State private var errorText: String?
+    var body: some View {
+        Form {
+            Section("Zulassungsbescheinigung Teil I") {
+                Button("Сфотографировать документ") { showingCamera = true }
+                    .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
+                if processing { ProgressView("Распознавание…") }
+                if let errorText { Text(errorText).foregroundStyle(.red) }
+            }
+            if !fields.isEmpty {
+                Section("Распознано — проверьте по документу") {
+                    ForEach(["E", "2.1", "2.2", "B", "D.1", "D.3"], id: \.self) { field in
+                        HStack {
+                            Text(field)
+                            Spacer()
+                            Text(fields[field] ?? "Не найдено").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Section("Заводские параметры") {
+                    Text("Автоподбор отключён до проверки HSN/TSN, VIN и варианта подвески. Углы не подставляются без подтверждения.")
+                }
+            }
+        }
+        .navigationTitle("Фото · автомобиль")
+        .sheet(isPresented: $showingCamera) {
+            FahrzeugscheinCamera { image in
+                showingCamera = false
+                guard let image, let cg = image.cgImage else { return }
+                processing = true
+                Task.detached(priority: .userInitiated) {
+                    let request = VNRecognizeTextRequest()
+                    request.recognitionLevel = .accurate
+                    request.recognitionLanguages = ["de-DE"]
+                    request.usesLanguageCorrection = false
+                    do {
+                        try VNImageRequestHandler(cgImage: cg).perform([request])
+                        let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                        let parsed = FahrzeugscheinFields.parse(lines)
+                        await MainActor.run { fields = parsed; processing = false; errorText = nil }
+                    } catch {
+                        await MainActor.run { processing = false; errorText = error.localizedDescription }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum FahrzeugscheinFields {
+    static func parse(_ lines: [String]) -> [String: String] {
+        var output: [String: String] = [:]
+        let keys = ["2.1", "2.2", "D.1", "D.3", "E", "B"]
+        for (i, raw) in lines.enumerated() {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            for key in keys where output[key] == nil {
+                let pattern = "^" + NSRegularExpression.escapedPattern(for: key) + "(?:\\s*[:.\\-]?\\s*)(.*)$"
+                guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { continue }
+                let range = NSRange(line.startIndex..<line.endIndex, in: line)
+                guard let match = regex.firstMatch(in: line, range: range),
+                      let valueRange = Range(match.range(at: 1), in: line) else { continue }
+                let sameLine = String(line[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let value = sameLine.isEmpty && i + 1 < lines.count ? lines[i + 1] : sameLine
+                if !value.isEmpty { output[key] = value }
+            }
+        }
+        // Reject obvious OCR confusion rather than invent an identity.
+        if let vin = output["E"], vin.uppercased().range(of: "^[A-HJ-NPR-Z0-9]{17}$", options: .regularExpression) == nil {
+            output.removeValue(forKey: "E")
+        }
+        return output
+    }
+}
+
+private struct FahrzeugscheinCamera: UIViewControllerRepresentable {
+    let onComplete: (UIImage?) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(onComplete: onComplete) }
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let controller = UIImagePickerController()
+        controller.sourceType = .camera
+        controller.delegate = context.coordinator
+        return controller
+    }
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let onComplete: (UIImage?) -> Void
+        init(onComplete: @escaping (UIImage?) -> Void) { self.onComplete = onComplete }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            onComplete(info[.originalImage] as? UIImage)
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onComplete(nil) }
     }
 }
