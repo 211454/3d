@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "coverage": {"modelYearFrom": null, "modelYearThrough": 2020},
+  "units": {"angles": "degrees"},
+  "vehicles": [],
+  "requiredVehicleFields": ["make", "model", "modelYearFrom", "modelYearThrough", "variant", "suspension", "source"],
+  "alignmentFields": ["frontCamberLeft", "frontCamberRight", "frontToeLeft", "frontToeRight", "frontTotalToe", "casterLeft", "casterRight", "rearCamberLeft", "rearCamberRight", "rearToeLeft", "rearToeRight", "rearTotalToe"],
+  "angleRecordFormat": {"nominal": null, "minimum": null, "maximum": null},
+  "sourceFormat": {"title": "", "url": "", "publisher": "", "verifiedAt": "", "reusePermission": ""},
+  "notes": "No factory specifications have been imported or verified. Do not treat missing values as zero. Confirm exact vehicle variant and suspension before using specifications for alignment."
+}
