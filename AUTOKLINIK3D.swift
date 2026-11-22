@@ -755,6 +755,7 @@ struct FahrzeugscheinScannerScreen: View {
                     TextField("Год выпуска (из документа или подтверждённый)", text: $modelYear)
                         .keyboardType(.numberPad)
                     TextField("Код подвески (например, G05)", text: $suspensionCode)
+                        .textInputAutocapitalization(.characters)
                     Button("Найти справочные углы для теста") {
                         referenceStatus = VAGDocumentReference.lookup(
                             fields: fields, model: modelVariant, year: Int(modelYear),
@@ -767,7 +768,6 @@ struct FahrzeugscheinScannerScreen: View {
                     if let meaning = FactoryAlignmentDatabase.vagSuspensionCodes[suspensionCode.uppercased()] {
                         Text(meaning).font(.caption).foregroundStyle(.secondary)
                     }
-                        .textInputAutocapitalization(.characters)
                     if let match = factoryMatch {
                         Text("Найдены заводские данные: \\(match.make) \\(match.model) — \\(match.suspensionCode)")
                         Text("Источник: \\(match.source)")
