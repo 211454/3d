@@ -338,8 +338,7 @@ struct ContentView: View {
                         documentConfirmed = true
                     }) }
                     if documentConfirmed { Text(documentSummary).font(.caption).foregroundStyle(.green) }
-                    else { Text(german ? "Schritt 1: Dokument prüfen, danach Sensortest" : "Этап 1: фото и проверка данных, затем тест измерений").font(.caption).foregroundStyle(.orange) }
-                        .font(.callout.bold())
+                    else { Text(german ? "Schritt 1: Dokument prüfen, danach Sensortest" : "Этап 1: фото и проверка данных, затем тест измерений").font(.callout.bold()).foregroundStyle(.orange) }
                     if documentConfirmed {
                     Picker(german ? "Fahrzeug" : "Автомобиль", selection: $selectedVehicle) {
                         ForEach(AlignmentDemoCatalog.models, id: \.self) { Text($0).tag($0) }
