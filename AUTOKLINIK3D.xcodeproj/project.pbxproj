@@ -99,7 +99,8 @@
                 CURRENT_PROJECT_VERSION = 1;
                 GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_KEY_CFBundleDisplayName = "AUTOKLINIK 3D";
-                INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
+                INFOPLIST_KEY_NSCameraUsageDescription = "Фотографирование Fahrzeugschein для определения автомобиля";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
                 INFOPLIST_KEY_NSMicrophoneUsageDescription = "Голосовые команды для измерения колёс";
                 INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Распознавание голосовых команд для измерения колёс";
                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -119,7 +120,8 @@
                 CURRENT_PROJECT_VERSION = 1;
                 GENERATE_INFOPLIST_FILE = YES;
                 INFOPLIST_KEY_CFBundleDisplayName = "AUTOKLINIK 3D";
-                INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
+                INFOPLIST_KEY_NSCameraUsageDescription = "Фотографирование Fahrzeugschein для определения автомобиля";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Измерение наклона колеса / Messung der Radneigung";
                 INFOPLIST_KEY_NSMicrophoneUsageDescription = "Голосовые команды для измерения колёс";
                 INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Распознавание голосовых команд для измерения колёс";
                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
