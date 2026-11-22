@@ -723,6 +723,9 @@ struct FahrzeugscheinScannerScreen: View {
                 }
                 Section("Проверка автомобиля") {
                     TextField("Код подвески (например, 1BA)", text: $suspensionCode)
+                    if let meaning = FactoryAlignmentDatabase.vagSuspensionCodes[suspensionCode.uppercased()] {
+                        Text(meaning).font(.caption).foregroundStyle(.secondary)
+                    }
                         .textInputAutocapitalization(.characters)
                     if let match = factoryMatch {
                         Text("Найдены заводские данные: \\(match.make) \\(match.model) — \\(match.suspensionCode)")
@@ -846,6 +849,14 @@ private enum FactoryAlignmentDatabase {
     static let audiModels = [
         "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8",
         "Q2", "Q3", "Q5", "Q7", "Q8", "TT", "R8"
+    ]
+    // VAG PR codes identify suspension equipment, not alignment angles.
+    // These must be confirmed on the vehicle data sticker/service record.
+    static let vagSuspensionCodes: [String: String] = [
+        "1BA": "Standard suspension / Serienfahrwerk",
+        "1BE": "Sports suspension / Sportfahrwerk",
+        "1BD": "Sports suspension variant; verify exact model",
+        "1BP": "Suspension variant; verify exact model"
     ]
     static let verified: [FactoryAlignmentEntry] = []
 
