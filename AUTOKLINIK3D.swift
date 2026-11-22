@@ -699,6 +699,9 @@ struct FahrzeugscheinScannerScreen: View {
     @State private var processing = false
     @State private var errorText: String?
     @State private var manuallyConfirmed = false
+    @State private var modelVariant = ""
+    @State private var modelYear = ""
+    @State private var referenceStatus = ""
     @State private var suspensionCode = ""
     private var factoryMatch: FactoryAlignmentEntry? {
         FactoryAlignmentDatabase.find(fields: fields, suspensionCode: suspensionCode)
@@ -722,7 +725,19 @@ struct FahrzeugscheinScannerScreen: View {
                     }
                 }
                 Section("Проверка автомобиля") {
-                    TextField("Код подвески (например, 1BA)", text: $suspensionCode)
+                    TextField("Модель / поколение (Passat B6 или Q3 8U)", text: $modelVariant)
+                    TextField("Год выпуска (из документа или подтверждённый)", text: $modelYear)
+                        .keyboardType(.numberPad)
+                    TextField("Код подвески (например, G05)", text: $suspensionCode)
+                    Button("Найти справочные углы для теста") {
+                        referenceStatus = VAGDocumentReference.lookup(
+                            fields: fields, model: modelVariant, year: Int(modelYear),
+                            suspension: suspensionCode
+                        )
+                    }
+                    if !referenceStatus.isEmpty {
+                        Text(referenceStatus).font(.callout).foregroundStyle(.cyan)
+                    }
                     if let meaning = FactoryAlignmentDatabase.vagSuspensionCodes[suspensionCode.uppercased()] {
                         Text(meaning).font(.caption).foregroundStyle(.secondary)
                     }
@@ -875,5 +890,47 @@ private enum FactoryAlignmentDatabase {
             $0.hsn == hsn && $0.tsn == tsn &&
             vin.hasPrefix($0.vinPrefix.uppercased())
         }
+    }
+}
+
+
+// MARK: - Document-to-reference test lookup
+// Source records are reference data only, not verified VIN/HSN-TSN mappings.
+// Require explicit model generation, year, and suspension code before showing a
+// candidate; do not assert that OCR alone establishes the correct factory setup.
+private enum VAGDocumentReference {
+    static func lookup(fields: [String: String], model: String, year: Int?, suspension: String) -> String {
+        guard let vin = fields["E"]?.uppercased(),
+              vin.range(of: "^[A-HJ-NPR-Z0-9]{17}$", options: .regularExpression) != nil,
+              let hsn = fields["2.1"], !hsn.isEmpty,
+              let tsn = fields["2.2"], !tsn.isEmpty,
+              let year, year <= 2020, year >= 2005 else {
+            return "Проверьте VIN, HSN/TSN и год автомобиля. Подбор невозможен."
+        }
+        let generation = model.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let code = suspension.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let make = (fields["D.1"] ?? "").uppercased()
+        if make.contains("VOLKSWAGEN") || make == "VW" {
+            guard generation == "PASSAT B6", (2005...2010).contains(year) else {
+                return "Для этой модели Volkswagen проверенная справочная запись отсутствует."
+            }
+            if ["G02","G07","G11","G12","G15"].contains(code) {
+                return "Passat B6, стандартная подвеска \\(code): передний развал −0°30′ ±30′; кастер +7°32′ ±30′. Справочные значения — подтвердить по заводскому документу перед регулировкой."
+            }
+            if ["G03","G08","G23","G28"].contains(code) {
+                return "Passat B6, спортивная подвеска \\(code): передний развал −0°41′ ±30′; кастер +7°44′ ±30′. Справочные значения — подтвердить по заводскому документу перед регулировкой."
+            }
+        } else if make.contains("AUDI") {
+            guard generation == "Q3 8U", (2011...2018).contains(year) else {
+                return "Для этой модели Audi проверенная справочная запись отсутствует."
+            }
+            if ["G05","G11","G12","G14","G15","G43"].contains(code) {
+                return "Audi Q3 8U, подвеска \\(code): передний развал −0°36′ ±30′; кастер +7°44′ ±30′. Справочные значения — подтвердить по заводскому документу перед регулировкой."
+            }
+            if ["G09","G13"].contains(code) {
+                return "Audi Q3 8U, подвеска \\(code): передний развал −0°52′ ±30′; кастер +8°07′ ±30′. Справочные значения — подтвердить по заводскому документу перед регулировкой."
+            }
+        }
+        return "Код подвески не найден в справочнике. Углы не подставлены."
     }
 }
